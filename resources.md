@@ -4,4 +4,4 @@ Resources for project
 - github `https://github.com/google/go-github`
   For interacting with github
 - gocui `https://github.com/jroimartin/gocui`
-  For createing console interface
+  For creating console interface
