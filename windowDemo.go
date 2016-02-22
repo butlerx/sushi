@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/jroimartin/gocui"
+	"io/ioutil"
 	"log"
+	"os"
+
+	"github.com/jroimartin/gocui"
 )
 
 func main() {
@@ -25,13 +28,20 @@ func main() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	if v, err := g.SetView("browser", 0, 0, maxX/2, maxY-1); err != nil {
+	if v, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(v, "Browser")
+		arg1 := "./"
+		if len(os.Args) != 1 {
+			arg1 = os.Args[1]
+		}
+		files, _ := ioutil.ReadDir(arg1)
+		for _, f := range files {
+			fmt.Fprintln(v, f.Name())
+		}
 	}
-	if d, err := g.SetView("infopane", maxX/2, 0, maxX-1, maxY-1); err != nil {
+	if d, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
