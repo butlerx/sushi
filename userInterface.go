@@ -55,7 +55,13 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		infopane.Wrap = true
-		fmt.Fprintln(infopane, "")
+		browser, err := g.View("browser")
+		if err != nil {
+			return err
+		}
+		if err := getLine(g, browser); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -69,11 +75,23 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("infopane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("infopane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("browser", gocui.KeyEnter, gocui.ModNone, getLine); err != nil {
+	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, openInfo); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("infopane", gocui.KeyArrowLeft, gocui.ModNone, closeInfo); err != nil {
 		return err
 	}
 
@@ -85,6 +103,31 @@ func keybindings(g *gocui.Gui) error {
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
 }
+func scrollDown(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		if err := v.SetCursor(cx, cy+1); err != nil {
+			ox, oy := v.Origin()
+			if err := v.SetOrigin(ox, oy+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func scrollUp(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		ox, oy := v.Origin()
+		cx, cy := v.Cursor()
+		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
+			if err := v.SetOrigin(ox, oy-1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
@@ -95,6 +138,9 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 				return err
 			}
 		}
+	}
+	if err := getLine(g, v); err != nil {
+		return err
 	}
 	return nil
 }
@@ -108,6 +154,9 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 				return err
 			}
 		}
+	}
+	if err := getLine(g, v); err != nil {
+		return err
 	}
 	return nil
 }
@@ -134,11 +183,29 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		infopane.Wrap = true
-		dat, err := ioutil.ReadFile(filePath)
-		if err != nil {
-			return err
+		if l != "" {
+			dat, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(infopane, string(dat))
+		} else {
+			fmt.Fprintln(infopane, "error")
 		}
-		fmt.Fprintln(infopane, string(dat))
+	}
+	return nil
+}
+
+func openInfo(g *gocui.Gui, v *gocui.View) error {
+	if err := g.SetCurrentView("infopane"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func closeInfo(g *gocui.Gui, v *gocui.View) error {
+	if err := g.SetCurrentView("browser"); err != nil {
+		return err
 	}
 	return nil
 }
