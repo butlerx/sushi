@@ -54,7 +54,8 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(infopane, "infopane")
+		infopane.Wrap = true
+		fmt.Fprintln(infopane, "")
 	}
 	return nil
 }
@@ -69,6 +70,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("browser", gocui.KeyEnter, gocui.ModNone, getLine); err != nil {
 		return err
 	}
 
@@ -103,6 +108,37 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+func getLine(g *gocui.Gui, v *gocui.View) error {
+	var l string
+	var arg1 string
+	var err error
+
+	_, cy := v.Cursor()
+	if l, err = v.Line(cy); err != nil {
+		l = ""
+	}
+	if len(os.Args) != 1 { //check to see if you have cmd line args
+		arg1 = os.Args[1]
+	}
+	filePath := arg1 + l
+	if err := g.DeleteView("infopane"); err != nil {
+		return err
+	}
+	maxX, maxY := g.Size()
+	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		infopane.Wrap = true
+		dat, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(infopane, string(dat))
 	}
 	return nil
 }
