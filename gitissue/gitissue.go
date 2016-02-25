@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -21,23 +22,33 @@ var (
 	conf   *Config
 )
 
-func Login() error {
+func write(toWrite []github.Issue) error {
+	b, err := json.Marshal(toWrite)
+	if err == nil {
+		err = ioutil.WriteFile(".issue/issues.json", b, 0644)
+	}
+	return err
+}
 
-	file, err := ioutil.ReadFile("config.json")
+func SetUp() {
+	err := os.Mkdir(".issue", 0755)
+	if err != nil {
+		log.Println("make folder: ", err)
+	}
+}
+
+func Login() error {
+	file, err := ioutil.ReadFile(".issue/config.json")
 	if err != nil {
 		log.Println("open config: ", err)
 		os.Exit(1)
 	}
-
 	temp := new(Config)
 	if err = json.Unmarshal(file, temp); err != nil {
 		log.Println("parse config: ", err)
 		os.Exit(1)
 	}
-	fmt.Println(temp)
 	conf = temp
-	fmt.Println(conf)
-
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: conf.Token},
 	)
@@ -53,8 +64,30 @@ func Login() error {
 	return nil
 }
 
-func Issues() ([]github.Issue, error) {
-	issues, _, err := client.Issues.List(false, nil)
+func Issues(repo string) ([]github.Issue, error) {
+	var issues []github.Issue
+	var err error
+	s := strings.Split(repo, "/")
+	if repo == "" {
+		issues, _, err = client.Issues.List(false, nil)
+	} else {
+		issues, _, err = client.Issues.ListByRepo(s[0], s[1], nil)
+	}
+	if err == nil {
+		write(issues)
+		return issues, err
+	}
+	file, err := ioutil.ReadFile(".issue/issues.json")
+	if err != nil {
+		log.Println("open issues: ", err)
+		os.Exit(1)
+	}
+	temp := new([]github.Issue)
+	if err = json.Unmarshal(file, temp); err != nil {
+		log.Println("parse issues: ", err)
+		os.Exit(1)
+	}
+	issues = *temp
 	return issues, err
 }
 
