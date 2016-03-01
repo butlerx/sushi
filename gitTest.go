@@ -13,10 +13,17 @@ func main() {
 		return
 	}
 	gitissue.Login()
-	issues, err := gitissue.Issues("butlerx/butlerbot")
+	/*issues, err := gitissue.Issues("butlerx/butlerbot")
 	if err == nil {
-		fmt.Println(issues[0])
+		fmt.Println(issues)
 	}
 	//fmt.Println(gitissue.Repos())
-	//fmt.Println(gitissue.OrgsList())
+	//fmt.Println(gitissue.OrgsList())*/
+	labels := []string{}
+	issue, err := gitissue.MakeIssue("butlerx/AgileGit", "test", "What the title says really", "butlerx", 0, labels)
+	if err == nil {
+		fmt.Println(issue)
+	} else {
+		log.Println(err)
+	}
 }

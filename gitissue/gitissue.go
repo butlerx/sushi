@@ -145,3 +145,28 @@ func OrgsList() ([]github.Organization, error) {
 	orgs, _, err := client.Organizations.List(conf.Username, nil)
 	return orgs, err
 }
+
+func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
+	s := strings.Split(repo, "/")
+	err = nil
+	newIssue := new(github.Issue)
+	state := "open"
+	if milestone == 0 {
+		issue := new(github.IssueRequest)
+		issue.Title = &title
+		issue.Body = &body
+		issue.Labels = &labels
+		issue.Assignee = &assignee
+		issue.State = &state
+		newIssue, _, err = client.Issues.Create(s[0], s[1], issue)
+	} else {
+		issue := github.IssueRequest{&title, &body, &labels, &assignee, &state, &milestone}
+		newIssue, _, err = client.Issues.Create(s[0], s[1], &issue)
+	}
+	if err == nil {
+		_, err = Issues(repo)
+		return newIssue, err
+	} else {
+		return newIssue, err
+	}
+}
