@@ -3,10 +3,15 @@ package main
 import (
 	"./gitissue"
 	"fmt"
+	"log"
 )
 
 func main() {
-	//gitissue.SetUp("a username", "a token")
+	err := gitissue.SetUp("a username", "a token")
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	gitissue.Login()
 	issues, err := gitissue.Issues("butlerx/butlerbot")
 	if err == nil {

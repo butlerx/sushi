@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -18,41 +19,49 @@ type Config struct {
 }
 
 var (
-	client = github.NewClient(nil)
-	conf   *Config
+	client          = github.NewClient(nil)
+	conf            *Config
+	folderpath, err = filepath.Abs(".")
+	path            = folderpath + "/"
 )
 
 func write(toWrite []github.Issue, file string) error {
-	file = ".issue/" + file + ".json"
+	file = path + ".issue/" + file + ".json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {
-		err = ioutil.WriteFile(".issue/issues.json", b, 0644)
+		err = ioutil.WriteFile(file, b, 0644)
 	}
 	return err
 }
 
 func SetUp(user, oauth string) error {
-	_, err := os.Stat(".issue")
+	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
-		err := os.Mkdir(".issue", 0755)
+		return err
+	}
+	_, err = os.Stat(path + ".issue")
+	if os.IsNotExist(err) {
+		err := os.Mkdir(path+".issue", 0755)
 		if err != nil {
 			log.Println("make folder: ", err)
 			return err
 		}
 	}
-	_, err = os.Stat(".issue/config.json")
-	if os.IsNotExist(err) {
+	_, err = ioutil.ReadFile(path + ".issue/config.json")
+	if err != nil {
 		temp := Config{user, oauth}
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(".issue/config.json", b, 0644)
+			err = ioutil.WriteFile(path+".issue/config.json", b, 0644)
+		} else {
+			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func Login() error {
-	file, err := ioutil.ReadFile(".issue/config.json")
+	file, err := ioutil.ReadFile(path + ".issue/config.json")
 	if err != nil {
 		log.Println("open config: ", err)
 		os.Exit(1)
@@ -112,7 +121,7 @@ func Issues(repo string) ([]github.Issue, error) {
 		write(issues, "issues")
 		return issues, err
 	}
-	file, err := ioutil.ReadFile(".issue/issues.json")
+	file, err := ioutil.ReadFile(path + ".issue/issues.json")
 	if err != nil {
 		log.Println("open issues: ", err)
 		os.Exit(1)
