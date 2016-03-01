@@ -1,15 +1,22 @@
-package main
+package issuebrowser
 
 import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 
 	"github.com/jroimartin/gocui"
 )
 
-func main() {
+var path = "./"
+
+// PassArgs allows the calling program to pass a file path as a string
+func PassArgs(s string) {
+	path = s
+}
+
+//Show is the main display function for the issue browser
+func Show() {
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -31,18 +38,13 @@ func main() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	arg1 := "./"           //by default, read current dir
-	if len(os.Args) != 1 { //check to see if you have cmd line args
-		arg1 = os.Args[1]
-	}
-	files, _ := ioutil.ReadDir(arg1)
+	files, _ := ioutil.ReadDir(path)
 
 	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		browser.Highlight = true
-
 		for _, f := range files { //print file names
 			fmt.Fprintln(browser, f.Name())
 		}
@@ -163,17 +165,14 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 
 func getLine(g *gocui.Gui, v *gocui.View) error {
 	var l string
-	var arg1 string
 	var err error
 
 	_, cy := v.Cursor()
 	if l, err = v.Line(cy); err != nil {
 		l = ""
 	}
-	if len(os.Args) != 1 { //check to see if you have cmd line args
-		arg1 = os.Args[1]
-	}
-	filePath := arg1 + l
+
+	filePath := path + l
 	if err := g.DeleteView("infopane"); err != nil {
 		return err
 	}
