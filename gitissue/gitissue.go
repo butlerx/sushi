@@ -22,7 +22,8 @@ var (
 	conf   *Config
 )
 
-func write(toWrite []github.Issue) error {
+func write(toWrite []github.Issue, file string) error {
+	file = ".issue/" + file + ".json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {
 		err = ioutil.WriteFile(".issue/issues.json", b, 0644)
@@ -30,11 +31,24 @@ func write(toWrite []github.Issue) error {
 	return err
 }
 
-func SetUp() {
-	err := os.Mkdir(".issue", 0755)
-	if err != nil {
-		log.Println("make folder: ", err)
+func SetUp(user, oauth string) error {
+	_, err := os.Stat(".issue")
+	if os.IsNotExist(err) {
+		err := os.Mkdir(".issue", 0755)
+		if err != nil {
+			log.Println("make folder: ", err)
+			return err
+		}
 	}
+	_, err = os.Stat(".issue/config.json")
+	if os.IsNotExist(err) {
+		temp := Config{user, oauth}
+		b, err := json.Marshal(temp)
+		if err == nil {
+			err = ioutil.WriteFile(".issue/config.json", b, 0644)
+		}
+	}
+	return err
 }
 
 func Login() error {
@@ -64,17 +78,38 @@ func Login() error {
 	return nil
 }
 
-func Issues(repo string) ([]github.Issue, error) {
-	var issues []github.Issue
-	var err error
+func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string, labels []string) ([]github.Issue, error) {
 	s := strings.Split(repo, "/")
-	if repo == "" {
-		issues, _, err = client.Issues.List(false, nil)
-	} else {
-		issues, _, err = client.Issues.ListByRepo(s[0], s[1], nil)
+	sorting := new(github.IssueListByRepoOptions)
+	if len(labels) != 0 {
+		sorting.Labels = labels
 	}
+	if state != "" {
+		sorting.State = state
+	}
+	if milestone != "" {
+		sorting.Milestone = milestone
+	}
+	if assignee != "" {
+		sorting.Assignee = assignee
+	}
+	if creator != "" {
+		sorting.Creator = creator
+	}
+	if sort != "" {
+		sorting.Sort = sort
+	}
+	if order != "" {
+		sorting.Direction = order
+	}
+	issues, _, err := client.Issues.ListByRepo(s[0], s[1], sorting)
+	return issues, err
+}
+
+func Issues(repo string) ([]github.Issue, error) {
+	issues, err := IssuesFilter(repo, "", "", "", "", "", "", nil)
 	if err == nil {
-		write(issues)
+		write(issues, "issues")
 		return issues, err
 	}
 	file, err := ioutil.ReadFile(".issue/issues.json")

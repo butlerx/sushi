@@ -6,9 +6,12 @@ import (
 )
 
 func main() {
-	gitissue.SetUp()
+	//gitissue.SetUp("a username", "a token")
 	gitissue.Login()
-	fmt.Println(gitissue.Issues("butlerx/butlerbot"))
+	issues, err := gitissue.Issues("butlerx/butlerbot")
+	if err == nil {
+		fmt.Println(issues[0])
+	}
 	//fmt.Println(gitissue.Repos())
 	//fmt.Println(gitissue.OrgsList())
 }
