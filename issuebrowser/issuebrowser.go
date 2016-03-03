@@ -4,11 +4,31 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 
+	"github.com/butlerx/AgileGit/gitissue"
 	"github.com/jroimartin/gocui"
 )
 
 var path = "./"
+
+func getRepo() string {
+	dat, err := ioutil.ReadFile(".git/config")
+	if err != nil {
+		panic(err)
+	}
+	list := strings.Split(string(dat), "\n")
+	ans := ""
+	for i := 0; i < len(list); i++ {
+		if strings.Contains(list[i], "github.com") {
+			sublist := strings.Split(list[i], "github.com")
+			ans = sublist[len(sublist)-1]
+		}
+	}
+	return ans
+}
+
+//var issueList = gitissue.Issues()
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -17,6 +37,11 @@ func PassArgs(s string) {
 
 //Show is the main display function for the issue browser
 func Show() {
+	list, err := gitissue.Issues(getRepo())
+	if err != nil {
+		log.Panicln(err)
+	}
+	fmt.Println(list[0])
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)

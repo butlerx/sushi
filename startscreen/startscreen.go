@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/butlerx/AgileGit/issuebrowser"
 	"github.com/jroimartin/gocui"
 )
 
@@ -76,15 +77,10 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("browser", gocui.KeyEnter, gocui.ModNone, startCui); err != nil {
 		return err
 	}
 	return nil
@@ -184,4 +180,26 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		}
 	}
 	return nil
+}
+
+func startCui(g *gocui.Gui, v *gocui.View) error {
+	var l string
+	var err error
+
+	_, cy := v.Cursor()
+	if l, err = v.Line(cy); err != nil {
+		l = ""
+	}
+
+	if l == "First Time Startup" {
+		//call to sushi first time init
+	} else if l == "Issue Browser" {
+		g.Close()
+		defer issuebrowser.Show() //currently causes the terminal to hang
+	} else if l == "Pull Request Manager" {
+		//call to pull request manager
+	} else {
+		//error message goes here
+	}
+	return gocui.ErrQuit
 }
