@@ -7,10 +7,12 @@ import (
 	"strings"
 
 	"github.com/butlerx/AgileGit/gitissue"
+	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
 )
 
 var path = "./"
+var issueList = getIssues()
 
 func getRepo() string {
 	dat, err := ioutil.ReadFile(".git/config")
@@ -28,7 +30,13 @@ func getRepo() string {
 	return ans
 }
 
-//var issueList = gitissue.Issues()
+func getIssues() []github.Issue {
+	iss, err := gitissue.Issues(getRepo())
+	if err != nil {
+		log.Panicln(err)
+	}
+	return iss
+}
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -37,11 +45,6 @@ func PassArgs(s string) {
 
 //Show is the main display function for the issue browser
 func Show() {
-	list, err := gitissue.Issues(getRepo())
-	if err != nil {
-		log.Panicln(err)
-	}
-	fmt.Println(list[0])
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -63,15 +66,14 @@ func Show() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	files, _ := ioutil.ReadDir(path)
-
 	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		browser.Highlight = true
-		for _, f := range files { //print file names
-			fmt.Fprintln(browser, f.Name())
+		for i := 0; i < len(issueList); i++ {
+			fmt.Fprint(browser, *issueList[i].Number)
+			fmt.Fprintln(browser, ": "+(*issueList[i].Title))
 		}
 		if err := g.SetCurrentView("browser"); err != nil {
 			return err
@@ -82,13 +84,13 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		infopane.Wrap = true
-		browser, err := g.View("browser")
+		/*browser, err := g.View("browser")
 		if err != nil {
 			return err
 		}
 		if err := getLine(g, browser); err != nil {
 			return err
-		}
+		}*/
 	}
 	return nil
 }
@@ -167,9 +169,9 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	if err := getLine(g, v); err != nil {
+	/*if err := getLine(g, v); err != nil {
 		return err
-	}
+	}*/
 	return nil
 }
 
@@ -183,9 +185,9 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	if err := getLine(g, v); err != nil {
+	/*if err := getLine(g, v); err != nil {
 		return err
-	}
+	}*/
 	return nil
 }
 
