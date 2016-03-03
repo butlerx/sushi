@@ -5,13 +5,14 @@ import (
 	"os"
 
 	"./issuebrowser"
+	"./startscreen"
 )
 
 func main() {
 	var path string
 	switch {
 	case len(os.Args) == 1:
-		fmt.Println("Main cui goes here")
+		startscreen.Show()
 
 	case os.Args[1] == "list":
 		if len(os.Args) != 2 { //check to see if you have cmd line args

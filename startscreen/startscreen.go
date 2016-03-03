@@ -1,8 +1,7 @@
-package issuebrowser
+package startscreen
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 
 	"github.com/jroimartin/gocui"
@@ -15,7 +14,7 @@ func PassArgs(s string) {
 	path = s
 }
 
-//Show is the main display function for the issue browser
+//Show is the main display function for the start screen
 func Show() {
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
@@ -38,21 +37,21 @@ func Show() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	files, _ := ioutil.ReadDir(path)
 
-	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
+	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		browser.Highlight = true
-		for _, f := range files { //print file names
-			fmt.Fprintln(browser, f.Name())
-		}
+		fmt.Fprintln(browser, "First Time Startup")
+		fmt.Fprintln(browser, "Issue Browser")
+		fmt.Fprintln(browser, "Pull Request Manager")
 		if err := g.SetCurrentView("browser"); err != nil {
 			return err
 		}
 	}
-	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
+
+	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -88,15 +87,6 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, openInfo); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowLeft, gocui.ModNone, closeInfo); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -173,39 +163,25 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
-	filePath := path + l
 	if err := g.DeleteView("infopane"); err != nil {
 		return err
 	}
+
 	maxX, maxY := g.Size()
 	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		infopane.Wrap = true
-		if l != "" {
-			dat, err := ioutil.ReadFile(filePath)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintln(infopane, string(dat))
+		if l == "First Time Startup" {
+			fmt.Fprintln(infopane, "Initializes sushi for the first time in a repo, creating a .issue folder and storing github issues locally within the repository.")
+		} else if l == "Issue Browser" {
+			fmt.Fprintln(infopane, "A browser for viewing, managing and editing github issues.")
+		} else if l == "Pull Request Manager" {
+			fmt.Fprintln(infopane, "A browser for viewing and managing pull requests.")
 		} else {
-			fmt.Fprintln(infopane, "error")
+			fmt.Fprintln(infopane, "Error")
 		}
-	}
-	return nil
-}
-
-func openInfo(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("infopane"); err != nil {
-		return err
-	}
-	return nil
-}
-
-func closeInfo(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("browser"); err != nil {
-		return err
 	}
 	return nil
 }
