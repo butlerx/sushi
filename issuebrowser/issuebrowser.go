@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/butlerx/AgileGit/gitissue"
 	"github.com/google/go-github/github"
@@ -84,13 +86,13 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		infopane.Wrap = true
-		/*browser, err := g.View("browser")
+		browser, err := g.View("browser")
 		if err != nil {
 			return err
 		}
 		if err := getLine(g, browser); err != nil {
 			return err
-		}*/
+		}
 	}
 	return nil
 }
@@ -169,9 +171,9 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	/*if err := getLine(g, v); err != nil {
+	if err := getLine(g, v); err != nil {
 		return err
-	}*/
+	}
 	return nil
 }
 
@@ -185,9 +187,9 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	/*if err := getLine(g, v); err != nil {
+	if err := getLine(g, v); err != nil {
 		return err
-	}*/
+	}
 	return nil
 }
 
@@ -200,7 +202,6 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
-	filePath := path + l
 	if err := g.DeleteView("infopane"); err != nil {
 		return err
 	}
@@ -211,11 +212,25 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		}
 		infopane.Wrap = true
 		if l != "" {
-			dat, err := ioutil.ReadFile(filePath)
-			if err != nil {
-				return err
+			issNum := strings.Split(l, ":")
+			index := 0
+			for ; index < len(issueList); index++ {
+				if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
+					fmt.Fprintln(infopane, *issueList[index].Title)
+					fmt.Fprintln(infopane, "")
+
+					labels := issueList[index].Labels
+					if len(labels) > 0 {
+						fmt.Fprint(infopane, "Lables: ")
+						var labelList = *labels[0].Name
+						for i := 1; i < len(labels); i++ {
+							labelList = labelList + ", " + (*labels[i].Name)
+						}
+						fmt.Fprintln(infopane, labelList)
+					}
+					fmt.Fprintln(infopane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+				}
 			}
-			fmt.Fprintln(infopane, string(dat))
 		} else {
 			fmt.Fprintln(infopane, "error")
 		}
