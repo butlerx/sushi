@@ -81,11 +81,23 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
-	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
+	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY); err != nil { //draw centre pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		infopane.Wrap = true
+		issuepane.Wrap = true
+	}
+	if labelpane, err := g.SetView("labelpane", maxX-(maxX/5), -1, maxX, maxY/3); err != nil { //draw labels pane
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(labelpane, "Labels")
+	}
+	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY); err != nil { //draw milestone pane
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(milestonepane, "Milestone")
 		browser, err := g.View("browser")
 		if err != nil {
 			return err
@@ -106,11 +118,11 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+	if err := g.SetKeybinding("issuepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+	if err := g.SetKeybinding("issuepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
 		return err
 	}
 
@@ -118,11 +130,11 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, openInfo); err != nil {
+	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, moveRight); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowLeft, gocui.ModNone, closeInfo); err != nil {
+	if err := g.SetKeybinding("issuepane", gocui.KeyArrowLeft, gocui.ModNone, moveLeft); err != nil {
 		return err
 	}
 
@@ -196,56 +208,88 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 func getLine(g *gocui.Gui, v *gocui.View) error {
 	var l string
 	var err error
+	var index int
 
 	_, cy := v.Cursor()
 	if l, err = v.Line(cy); err != nil {
 		l = ""
 	}
 
-	if err := g.DeleteView("infopane"); err != nil {
+	if err := g.DeleteView("issuepane"); err != nil {
 		return err
 	}
+	if err := g.DeleteView("labelpane"); err != nil {
+		return err
+	}
+	if err := g.DeleteView("milestonepane"); err != nil {
+		return err
+	}
+
 	maxX, maxY := g.Size()
-	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
+	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY); err != nil { //draw centre pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		infopane.Wrap = true
+		issuepane.Wrap = true
 		if l != "" {
 			issNum := strings.Split(l, ":")
-			index := 0
 			for ; index < len(issueList); index++ {
 				if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
-					fmt.Fprintln(infopane, *issueList[index].Title)
-					fmt.Fprintln(infopane, "")
-
-					labels := issueList[index].Labels
-					if len(labels) > 0 {
-						fmt.Fprint(infopane, "Lables: ")
-						var labelList = *labels[0].Name
-						for i := 1; i < len(labels); i++ {
-							labelList = labelList + ", " + (*labels[i].Name)
-						}
-						fmt.Fprintln(infopane, labelList)
-					}
-					fmt.Fprintln(infopane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+					fmt.Fprintln(issuepane, *issueList[index].Title)
+					fmt.Fprintln(issuepane, "")
+					fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+					break
 				}
 			}
 		} else {
-			fmt.Fprintln(infopane, "error")
+			fmt.Fprintln(issuepane, "error")
+		}
+	}
+
+	if labelpane, err := g.SetView("labelpane", maxX-(maxX/5), -1, maxX, maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		labelpane.Wrap = true
+		labels := issueList[index].Labels
+		if l != "" {
+			fmt.Fprintln(labelpane, "Labels")
+			fmt.Fprintln(labelpane, "")
+			for i := 0; i < len(labels); i++ {
+				fmt.Fprintln(labelpane, *labels[i].Name)
+			}
+		} else {
+			fmt.Fprintln(labelpane, "error")
+		}
+	}
+	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY); err != nil { //draw milestone pane
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		if l != "" {
+			fmt.Fprintln(milestonepane, "Milestone")
+			fmt.Fprintln(milestonepane, "")
+			if issueList[index].Milestone != nil {
+				complete := ((*issueList[index].Milestone.ClosedIssues)/(*issueList[index].Milestone.OpenIssues) + (*issueList[index].Milestone.ClosedIssues)) * 100
+				fmt.Fprintln(milestonepane, (strconv.Itoa(complete))+"%")
+			} else {
+				fmt.Fprintln(milestonepane, "No Milestone")
+			}
+		} else {
+			fmt.Fprintln(milestonepane, "error")
 		}
 	}
 	return nil
 }
 
-func openInfo(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("infopane"); err != nil {
+func moveRight(g *gocui.Gui, v *gocui.View) error {
+	if err := g.SetCurrentView("issuepane"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func closeInfo(g *gocui.Gui, v *gocui.View) error {
+func moveLeft(g *gocui.Gui, v *gocui.View) error {
 	if err := g.SetCurrentView("browser"); err != nil {
 		return err
 	}
