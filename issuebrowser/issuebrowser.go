@@ -93,11 +93,17 @@ func layout(g *gocui.Gui) error {
 		}
 		fmt.Fprintln(labelpane, "Labels")
 	}
-	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY); err != nil { //draw milestone pane
+	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY/3*2); err != nil { //draw milestone pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		fmt.Fprintln(milestonepane, "Milestone")
+	}
+	if assigneepane, err := g.SetView("assigneepane", maxX-(maxX/5), maxY/3*2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(assigneepane, "Assignee")
 		browser, err := g.View("browser")
 		if err != nil {
 			return err
@@ -176,10 +182,17 @@ func scrollUp(g *gocui.Gui, v *gocui.View) error {
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		cx, cy := v.Cursor()
-		if err := v.SetCursor(cx, cy+1); err != nil {
-			ox, oy := v.Origin()
-			if err := v.SetOrigin(ox, oy+1); err != nil {
-				return err
+		var l string
+		var err error
+		if l, err = v.Line(cy + 1); err != nil {
+			l = ""
+		}
+		if l != "" {
+			if err := v.SetCursor(cx, cy+1); err != nil {
+				ox, oy := v.Origin()
+				if err := v.SetOrigin(ox, oy+1); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -224,6 +237,9 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 	if err := g.DeleteView("milestonepane"); err != nil {
 		return err
 	}
+	if err := g.DeleteView("assigneepane"); err != nil {
+		return err
+	}
 
 	maxX, maxY := g.Size()
 	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY); err != nil { //draw centre pane
@@ -262,7 +278,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 			fmt.Fprintln(labelpane, "error")
 		}
 	}
-	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY); err != nil { //draw milestone pane
+	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY/3*2); err != nil { //draw milestone pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -278,6 +294,23 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		} else {
 			fmt.Fprintln(milestonepane, "error")
 		}
+	}
+	if assigneepane, err := g.SetView("assigneepane", maxX-(maxX/5), maxY/3*2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		if l != "" {
+			fmt.Fprintln(assigneepane, "Assignee")
+			fmt.Fprintln(assigneepane, "")
+			if issueList[index].Assignee != nil {
+				fmt.Fprintln(assigneepane, *issueList[index].Assignee.Login)
+			} else {
+				fmt.Fprintln(assigneepane, "No Assignee")
+			}
+		} else {
+			fmt.Fprintln(assigneepane, "error")
+		}
+
 	}
 	return nil
 }
