@@ -1,49 +1,21 @@
-package issuebrowser
+package startscreen
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
-	"strings"
 
-	"github.com/butlerx/AgileGit/gitissue"
-	"github.com/google/go-github/github"
+	"github.com/butlerx/AgileGit/issuebrowser"
 	"github.com/jroimartin/gocui"
 )
 
 var path = "./"
-var issueList = getIssues()
-
-func getRepo() string {
-	dat, err := ioutil.ReadFile(".git/config")
-	if err != nil {
-		panic(err)
-	}
-	list := strings.Split(string(dat), "\n")
-	ans := ""
-	for i := 0; i < len(list); i++ {
-		if strings.Contains(list[i], "github.com") {
-			sublist := strings.Split(list[i], "github.com")
-			ans = sublist[len(sublist)-1]
-		}
-	}
-	return ans
-}
-
-func getIssues() []github.Issue {
-	iss, err := gitissue.Issues(getRepo())
-	if err != nil {
-		log.Panicln(err)
-	}
-	return iss
-}
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
 	path = s
 }
 
-//Show is the main display function for the issue browser
+//Show is the main display function for the start screen
 func Show() {
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
@@ -66,31 +38,32 @@ func Show() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
-	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
+
+	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		browser.Highlight = true
-		for i := 0; i < len(issueList); i++ {
-			fmt.Fprint(browser, *issueList[i].Number)
-			fmt.Fprintln(browser, ": "+(*issueList[i].Title))
-		}
+		fmt.Fprintln(browser, "First Time Startup")
+		fmt.Fprintln(browser, "Issue Browser")
+		fmt.Fprintln(browser, "Pull Request Manager")
 		if err := g.SetCurrentView("browser"); err != nil {
 			return err
 		}
 	}
-	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
+
+	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		infopane.Wrap = true
-		/*browser, err := g.View("browser")
+		browser, err := g.View("browser")
 		if err != nil {
 			return err
 		}
 		if err := getLine(g, browser); err != nil {
 			return err
-		}*/
+		}
 	}
 	return nil
 }
@@ -104,26 +77,12 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, openInfo); err != nil {
+	if err := g.SetKeybinding("browser", gocui.KeyEnter, gocui.ModNone, startCui); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("infopane", gocui.KeyArrowLeft, gocui.ModNone, closeInfo); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -169,9 +128,9 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	/*if err := getLine(g, v); err != nil {
+	if err := getLine(g, v); err != nil {
 		return err
-	}*/
+	}
 	return nil
 }
 
@@ -185,9 +144,9 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	/*if err := getLine(g, v); err != nil {
+	if err := getLine(g, v); err != nil {
 		return err
-	}*/
+	}
 	return nil
 }
 
@@ -200,39 +159,47 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
-	filePath := path + l
 	if err := g.DeleteView("infopane"); err != nil {
 		return err
 	}
+
 	maxX, maxY := g.Size()
 	if infopane, err := g.SetView("infopane", maxX/3, -1, maxX, maxY); err != nil { //draw right pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		infopane.Wrap = true
-		if l != "" {
-			dat, err := ioutil.ReadFile(filePath)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintln(infopane, string(dat))
+		if l == "First Time Startup" {
+			fmt.Fprintln(infopane, "Initializes sushi for the first time in a repo, creating a .issue folder and storing github issues locally within the repository.")
+		} else if l == "Issue Browser" {
+			fmt.Fprintln(infopane, "A browser for viewing, managing and editing github issues.")
+		} else if l == "Pull Request Manager" {
+			fmt.Fprintln(infopane, "A browser for viewing and managing pull requests.")
 		} else {
-			fmt.Fprintln(infopane, "error")
+			fmt.Fprintln(infopane, "Error")
 		}
 	}
 	return nil
 }
 
-func openInfo(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("infopane"); err != nil {
-		return err
-	}
-	return nil
-}
+func startCui(g *gocui.Gui, v *gocui.View) error {
+	var l string
+	var err error
 
-func closeInfo(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("browser"); err != nil {
-		return err
+	_, cy := v.Cursor()
+	if l, err = v.Line(cy); err != nil {
+		l = ""
 	}
-	return nil
+
+	if l == "First Time Startup" {
+		//call to sushi first time init
+	} else if l == "Issue Browser" {
+		g.Close()
+		defer issuebrowser.Show() //currently causes the terminal to hang
+	} else if l == "Pull Request Manager" {
+		//call to pull request manager
+	} else {
+		//error message goes here
+	}
+	return gocui.ErrQuit
 }
