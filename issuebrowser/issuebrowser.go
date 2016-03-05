@@ -1,9 +1,12 @@
 package issuebrowser
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +17,6 @@ import (
 )
 
 var path = "./"
-var issueList = getIssues()
 
 func getRepo() string {
 	dat, err := ioutil.ReadFile(".git/config")
@@ -33,12 +35,46 @@ func getRepo() string {
 }
 
 func getIssues() []github.Issue {
+	getLogin()
 	iss, err := gitissue.Issues(getRepo())
 	if err != nil {
 		log.Panicln(err)
 	}
 	return iss
 }
+
+func hide() {
+	cmd := exec.Command("stty", "-echo")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func unhide() {
+	cmd := exec.Command("stty", "echo")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getLogin() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter GitHub username: ")
+	user, _ := reader.ReadString('\n')
+	fmt.Print("Enter GitHub password: ")
+	hide()
+	pass, _ := reader.ReadString('\n')
+	unhide()
+	gitissue.SetUp(user, pass)
+}
+
+var issueList = getIssues()
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -136,11 +172,11 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("browser", gocui.KeyArrowRight, gocui.ModNone, moveRight); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, moveRight); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("issuepane", gocui.KeyArrowLeft, gocui.ModNone, moveLeft); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, moveLeft); err != nil {
 		return err
 	}
 
@@ -316,15 +352,35 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 }
 
 func moveRight(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("issuepane"); err != nil {
-		return err
+	switch {
+	case v == nil || v.Name() == "assigneepane":
+		return g.SetCurrentView("browser")
+	case v.Name() == "browser":
+		return g.SetCurrentView("issuepane")
+	case v.Name() == "issuepane":
+		return g.SetCurrentView("labelpane")
+	case v.Name() == "labelpane":
+		return g.SetCurrentView("milestonepane")
+	case v.Name() == "milestonepane":
+		return g.SetCurrentView("assigneepane")
+	default:
+		return g.SetCurrentView("browser")
 	}
-	return nil
 }
 
 func moveLeft(g *gocui.Gui, v *gocui.View) error {
-	if err := g.SetCurrentView("browser"); err != nil {
-		return err
+	switch {
+	case v == nil || v.Name() == "issuepane":
+		return g.SetCurrentView("browser")
+	case v.Name() == "browser":
+		return g.SetCurrentView("assigneepane")
+	case v.Name() == "assigneepane":
+		return g.SetCurrentView("milestonepane")
+	case v.Name() == "milestonepane":
+		return g.SetCurrentView("labelpane")
+	case v.Name() == "labelpane":
+		return g.SetCurrentView("issuepane")
+	default:
+		return g.SetCurrentView("browser")
 	}
-	return nil
 }
