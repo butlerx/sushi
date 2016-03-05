@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"./issuebrowser"
-	"./startscreen"
+	"github.com/butlerx/AgileGit/issuebrowser"
+	"github.com/butlerx/AgileGit/startscreen"
 )
 
 func main() {
