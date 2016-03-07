@@ -61,11 +61,17 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
-	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY-2); err != nil { //draw centre pane
+	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY/4); err != nil { //draw centre pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		issuepane.Wrap = true
+	}
+	if commentpane, err := g.SetView("commentpane", maxX/3, maxY/4, maxX-(maxX/5), maxY-2); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		commentpane.Wrap = true
 	}
 	if labelpane, err := g.SetView("labelpane", maxX-(maxX/5), -1, maxX, maxY/3); err != nil { //draw labels pane
 		if err != gocui.ErrUnknownView {
@@ -170,13 +176,17 @@ func getRepo() string {
 		if strings.Contains(list[i], "github.com") {
 			sublist := strings.Split(list[i], "github.com")
 			ans = sublist[len(sublist)-1]
+			if strings.HasPrefix(ans, ":") {
+				ans = ans[1:(len(ans) - 4)]
+			} else {
+				ans = ans[1:]
+			}
 		}
 	}
 	return ans
 }
 
 func getIssues() []github.Issue {
-	getLogin()
 	iss, err := gitissue.Issues(getRepo())
 	if err != nil {
 		log.Panicln(err)
@@ -204,18 +214,23 @@ func unhide() {
 	}
 }
 
-func getLogin() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter GitHub username: ")
-	user, _ := reader.ReadString('\n')
-	fmt.Print("Enter GitHub password: ")
-	hide()
-	pass, _ := reader.ReadString('\n')
-	unhide()
-	gitissue.SetUp(user, pass)
+//GetLogin sets up the config file if it does not exist
+func GetLogin() {
+	if _, err := os.Stat(".issue/config.json"); os.IsNotExist(err) {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter GitHub username: ")
+		user, _ := reader.ReadString('\n')
+		fmt.Print("Enter GitHub Oauth token: ")
+		hide()
+		pass, _ := reader.ReadString('\n')
+		unhide()
+		gitissue.SetUp(user, pass)
+	}
 }
 
 func setUp() {
+	GetLogin()
+	gitissue.Login()
 	issueList = getIssues()
 }
 
@@ -328,7 +343,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	maxX, maxY := g.Size()
-	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY-2); err != nil { //draw centre pane
+	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY/4); err != nil { //draw centre pane
 		if err != gocui.ErrUnknownView {
 			return err
 		}
@@ -340,11 +355,27 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 					fmt.Fprintln(issuepane, *issueList[index].Title)
 					fmt.Fprintln(issuepane, "")
 					fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+
 					break
 				}
 			}
 		} else {
 			fmt.Fprintln(issuepane, "error")
+		}
+	}
+	if commentpane, err := g.SetView("commentpane", maxX/3, maxY/4, maxX-(maxX/5), maxY-2); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		commentpane.Wrap = true
+		fmt.Fprintln(commentpane, "Comments")
+		fmt.Fprintln(commentpane, "")
+		comments, err := gitissue.ListComments(getRepo(), (*issueList[index].Number))
+		if err != nil {
+			log.Panic(err)
+		}
+		for i := 0; i < (*issueList[index].Comments); i++ {
+			fmt.Fprintln(commentpane, *comments[i].Body)
 		}
 	}
 
