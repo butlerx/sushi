@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/butlerx/AgileGit/issuebrowser"
-	"github.com/butlerx/AgileGit/startscreen"
+	"./issuebrowser"
 )
 
 func main() {
 	var path string
 	switch {
 	case len(os.Args) == 1:
-		startscreen.Show()
+		fmt.Println("Please add an arguement")
 
 	case os.Args[1] == "list":
 		if len(os.Args) != 2 { //check to see if you have cmd line args
