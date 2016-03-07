@@ -5,7 +5,6 @@ import (
 	"golang.org/x/oauth2"
 
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -80,10 +79,10 @@ func Login() error {
 	user, _, err := client.Users.Get("")
 
 	if err != nil {
-		fmt.Printf("\nerror: %v\n", err)
+		log.Printf("\nerror: %v\n", err)
 		return err
 	}
-	fmt.Printf("\nLogged into: %v\n", github.Stringify(user.Name))
+	log.Printf("\nLogged into: %v\n", github.Stringify(user.Name))
 	return nil
 }
 
@@ -141,7 +140,7 @@ func Repos() ([]github.Repository, error) {
 }
 
 func OrgsList() ([]github.Organization, error) {
-	fmt.Println(conf.Username)
+	log.Println(conf.Username)
 	orgs, _, err := client.Organizations.List(conf.Username, nil)
 	return orgs, err
 }
@@ -168,5 +167,18 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 		return newIssue, err
 	} else {
 		return newIssue, err
+	}
+}
+
+func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
+	s := strings.Split(repo, "/")
+	err = nil
+	comments, _, err := client.Issues.ListComments(s[0], s[1], issueNum, nil)
+	if err == nil {
+		return comments, err
+	} else {
+		temp := new([]github.IssueComment)
+		comments = *temp
+		return comments, err
 	}
 }
