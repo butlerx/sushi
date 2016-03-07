@@ -182,3 +182,12 @@ func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
 		return comments, err
 	}
 }
+
+func Comment(repo, body string, issueNum int) (*github.IssueComment, error) {
+	s := strings.Split(repo, "/")
+	err = nil
+	comment := new(github.IssueComment)
+	comment.Body = &body
+	newComment, _, err := client.Issues.CreateComment(s[0], s[1], issueNum, comment)
+	return newComment, err
+}
