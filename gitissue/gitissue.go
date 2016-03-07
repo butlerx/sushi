@@ -114,8 +114,9 @@ func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string,
 	return issues, err
 }
 
+// pull all issues and write them to .issue/issues.json
 func Issues(repo string) ([]github.Issue, error) {
-	issues, err := IssuesFilter(repo, "", "", "", "", "", "", nil)
+	issues, err := IssuesFilter(repo, "all", "", "", "", "", "", nil)
 	if err == nil {
 		write(issues, "issues")
 		return issues, err
@@ -191,3 +192,8 @@ func Comment(repo, body string, issueNum int) (*github.IssueComment, error) {
 	newComment, _, err := client.Issues.CreateComment(s[0], s[1], issueNum, comment)
 	return newComment, err
 }
+
+func CreateLabel()    {}
+func AddLabel()       {}
+func DeleteComment()  {}
+func CreateMilstone() {}
