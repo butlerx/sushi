@@ -403,8 +403,8 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 			fmt.Fprintln(milestonepane, "Milestone")
 			fmt.Fprintln(milestonepane, "")
 			if issueList[index].Milestone != nil {
-				complete := ((*issueList[index].Milestone.ClosedIssues)/(*issueList[index].Milestone.OpenIssues) + (*issueList[index].Milestone.ClosedIssues)) * 100
-				fmt.Fprintln(milestonepane, (strconv.Itoa(complete))+"%")
+				complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues))) * 100
+				fmt.Fprintln(milestonepane, (strconv.FormatFloat(complete, 'f', 0, 64))+"%")
 			} else {
 				fmt.Fprintln(milestonepane, "No Milestone")
 			}
