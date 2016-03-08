@@ -14,6 +14,7 @@ import (
 	"github.com/butlerx/AgileGit/gitissue"
 	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
+	"github.com/robfig/cron"
 )
 
 var path = "./"
@@ -27,6 +28,9 @@ func PassArgs(s string) {
 //Show is the main display function for the issue browser
 func Show() {
 	setUp()
+	timer := cron.New()
+	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
+	timer.Start()
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -44,6 +48,7 @@ func Show() {
 	if err := window.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
+	timer.Stop()
 }
 
 func layout(g *gocui.Gui) error {
