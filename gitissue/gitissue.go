@@ -22,10 +22,6 @@ type Comments struct {
 	Num   int
 }
 
-type CommentStore struct {
-	db []Comments
-}
-
 var (
 	client          = github.NewClient(nil)
 	conf            *Config
@@ -237,7 +233,14 @@ func Comment(repo, body string, issueNum int) (*github.IssueComment, error) {
 	return newComment, err
 }
 
-func CreateLabel()    {}
+func CreateLabel(repo, labelName string) (github.Label, error) {
+	s := strings.Split(repo, "/")
+	label := new(github.Label)
+	label.Name = &labelName
+	temp, _, err := client.Issues.CreateLabel(s[0], s[1], label)
+	newLabel := *temp
+	return newLabel, err
+}
 func AddLabel()       {}
 func DeleteComment()  {}
 func CreateMilstone() {}
