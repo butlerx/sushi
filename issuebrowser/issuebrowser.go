@@ -102,7 +102,7 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
+		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit, "+"\t"+"Ctrl+R = Refresh")
 	}
 	return nil
 }
@@ -157,6 +157,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, moveLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyCtrlR, gocui.ModNone, refresh); err != nil {
 		return err
 	}
 
@@ -234,6 +238,30 @@ func setUp() {
 }
 
 //functions called by keypress below
+
+func refresh(g *gocui.Gui, v *gocui.View) error {
+	issueList = getIssues()
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	current := g.CurrentView()
+	if err := g.SetCurrentView("browser"); err != nil {
+		return err
+	}
+	browser.Clear()
+	for i := 0; i < len(issueList); i++ {
+		fmt.Fprint(browser, *issueList[i].Number)
+		fmt.Fprintln(browser, ": "+(*issueList[i].Title))
+	}
+	if err := getLine(g, browser); err != nil {
+		return err
+	}
+	if err := g.SetCurrentView(current.Name()); err != nil {
+		return err
+	}
+	return nil
+}
 
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
