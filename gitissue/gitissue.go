@@ -17,6 +17,15 @@ type Config struct {
 	Token    string
 }
 
+type Comments struct {
+	Issue []github.IssueComment
+	Num   int
+}
+
+type CommentStore struct {
+	db []Comments
+}
+
 var (
 	client          = github.NewClient(nil)
 	conf            *Config
@@ -176,12 +185,47 @@ func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
 	err = nil
 	comments, _, err := client.Issues.ListComments(s[0], s[1], issueNum, nil)
 	if err == nil {
+		err = storecomments(comments, issueNum)
 		return comments, err
 	} else {
-		temp := new([]github.IssueComment)
-		comments = *temp
+		commentStore, err := readComments()
+		for i := 0; i < len(commentStore); i++ {
+			if commentStore[i].Num == issueNum {
+				comments = commentStore[i].Issue
+			}
+		}
 		return comments, err
 	}
+}
+
+func storecomments(comments []github.IssueComment, issueNum int) error {
+	toWrite, err := readComments()
+	if err == nil {
+		toAppend := Comments{comments, issueNum}
+		toWrite = append(toWrite, toAppend)
+		file := path + ".issue/comments.json"
+		b, err := json.Marshal(toWrite)
+		if err == nil {
+			err = ioutil.WriteFile(file, b, 0644)
+		}
+	}
+	return err
+}
+
+func readComments() ([]Comments, error) {
+	file := path + ".issue/comments.json"
+	read, err := ioutil.ReadFile(file)
+	if err != nil {
+		log.Println("open comments: ", err)
+		os.Exit(1)
+	}
+	temp := new([]Comments)
+	if err = json.Unmarshal(read, temp); err != nil {
+		log.Println("parse comments: ", err)
+		os.Exit(1)
+	}
+	comments := *temp
+	return comments, err
 }
 
 func Comment(repo, body string, issueNum int) (*github.IssueComment, error) {
