@@ -61,6 +61,26 @@ func SetUp(user, oauth string) error {
 			return err
 		}
 	}
+	_, err = ioutil.ReadFile(path + ".issue/issues.json")
+	if err != nil {
+		temp := new([]github.Issue)
+		b, err := json.Marshal(temp)
+		if err == nil {
+			err = ioutil.WriteFile(path+".issue/issues.json", b, 0644)
+		} else {
+			return err
+		}
+	}
+	_, err = ioutil.ReadFile(path + ".issue/comments.json")
+	if err != nil {
+		temp := new([]Comments)
+		b, err := json.Marshal(temp)
+		if err == nil {
+			err = ioutil.WriteFile(path+".issue/comments.json", b, 0644)
+		} else {
+			return err
+		}
+	}
 	return nil
 }
 
