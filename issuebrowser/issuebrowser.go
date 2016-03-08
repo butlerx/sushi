@@ -90,13 +90,6 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		fmt.Fprintln(assigneepane, "Assignee")
-
-	}
-	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
 		browser, err := g.View("browser")
 		if err != nil {
 			return err
@@ -104,6 +97,12 @@ func layout(g *gocui.Gui) error {
 		if err := getLine(g, browser); err != nil {
 			return err
 		}
+	}
+	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
 	}
 	return nil
 }
@@ -326,114 +325,104 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
-	if err := g.DeleteView("issuepane"); err != nil {
+	issuepane, err := g.View("issuepane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("labelpane"); err != nil {
+	commentpane, err := g.View("commentpane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("milestonepane"); err != nil {
+	labelpane, err := g.View("labelpane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("assigneepane"); err != nil {
+	milestonepane, err := g.View("milestonepane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("helppane"); err != nil {
+	assigneepane, err := g.View("assigneepane")
+	if err != nil {
 		return err
 	}
 
-	maxX, maxY := g.Size()
-	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY/4); err != nil { //draw centre pane
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		issuepane.Wrap = true
-		if l != "" {
-			issNum := strings.Split(l, ":")
-			for ; index < len(issueList); index++ {
-				if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
-					fmt.Fprintln(issuepane, *issueList[index].Title)
-					fmt.Fprintln(issuepane, "")
-					fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+	maxX, _ := g.Size()
+	issuepane.Clear()
+	commentpane.Clear()
+	labelpane.Clear()
+	milestonepane.Clear()
+	assigneepane.Clear()
 
-					break
-				}
+	fmt.Fprintln(commentpane, "Comments")
+	fmt.Fprintln(commentpane, "")
+	fmt.Fprintln(labelpane, "Labels")
+	fmt.Fprintln(labelpane, "")
+	fmt.Fprintln(milestonepane, "Milestone")
+	fmt.Fprintln(milestonepane, "")
+	fmt.Fprintln(assigneepane, "Assignee")
+	fmt.Fprintln(assigneepane, "")
+	if l != "" {
+		//show issue body
+		issNum := strings.Split(l, ":")
+		for ; index < len(issueList); index++ {
+			if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
+				fmt.Fprintln(issuepane, *issueList[index].Title)
+				fmt.Fprintln(issuepane, "")
+				fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+				break
 			}
-		} else {
-			fmt.Fprintln(issuepane, "error")
 		}
-	}
-	if commentpane, err := g.SetView("commentpane", maxX/3, maxY/4, maxX-(maxX/5), maxY-2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		commentpane.Wrap = true
-		fmt.Fprintln(commentpane, "Comments")
-		fmt.Fprintln(commentpane, "")
-		comments, err := gitissue.ListComments(getRepo(), (*issueList[index].Number))
+
+		//show comments
+		/*comments, err := gitissue.ListComments(getRepo(), (*issueList[index].Number))
 		if err != nil {
 			log.Panic(err)
 		}
 		for i := 0; i < (*issueList[index].Comments); i++ {
 			fmt.Fprintln(commentpane, *comments[i].Body)
-		}
-	}
+		}*/
 
-	if labelpane, err := g.SetView("labelpane", maxX-(maxX/5), -1, maxX, maxY/3); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		labelpane.Wrap = true
+		//show labes
 		labels := issueList[index].Labels
-		if l != "" {
-			fmt.Fprintln(labelpane, "Labels")
-			fmt.Fprintln(labelpane, "")
-			for i := 0; i < len(labels); i++ {
-				fmt.Fprintln(labelpane, *labels[i].Name)
-			}
-		} else {
-			fmt.Fprintln(labelpane, "error")
+		if len(labels) == 0 {
+			fmt.Fprintln(labelpane, "No Labels")
 		}
-	}
-	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY/3*2); err != nil { //draw milestone pane
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		if l != "" {
-			fmt.Fprintln(milestonepane, "Milestone")
-			fmt.Fprintln(milestonepane, "")
-			if issueList[index].Milestone != nil {
-				complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues))) * 100
-				fmt.Fprintln(milestonepane, (strconv.FormatFloat(complete, 'f', 0, 64))+"%")
-			} else {
-				fmt.Fprintln(milestonepane, "No Milestone")
-			}
-		} else {
-			fmt.Fprintln(milestonepane, "error")
-		}
-	}
-	if assigneepane, err := g.SetView("assigneepane", maxX-(maxX/5), maxY/3*2, maxX, maxY-2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		if l != "" {
-			fmt.Fprintln(assigneepane, "Assignee")
-			fmt.Fprintln(assigneepane, "")
-			if issueList[index].Assignee != nil {
-				fmt.Fprintln(assigneepane, *issueList[index].Assignee.Login)
-			} else {
-				fmt.Fprintln(assigneepane, "No Assignee")
-			}
-		} else {
-			fmt.Fprintln(assigneepane, "error")
+		for i := 0; i < len(labels); i++ {
+			fmt.Fprintln(labelpane, *labels[i].Name)
 		}
 
-	}
-	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
+		//show milestone
+		if issueList[index].Milestone != nil {
+			complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues)))
+			barWidth := (maxX / 5) - 4
+			bars := int(float64(barWidth) * complete)
+			gaps := barWidth - bars
+			fmt.Fprint(milestonepane, "[")
+			for i := 0; i < bars; i++ {
+				fmt.Fprint(milestonepane, "|")
+			}
+			for i := 0; i < gaps; i++ {
+				fmt.Fprint(milestonepane, " ")
+			}
+			fmt.Fprintln(milestonepane, "]")
+			complete = complete * 100
+			fmt.Fprintln(milestonepane, (strconv.FormatFloat(complete, 'f', 0, 64))+"%")
+		} else {
+			fmt.Fprintln(milestonepane, "No Milestone")
 		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
+
+		//show assignee
+		if issueList[index].Assignee != nil {
+			fmt.Fprintln(assigneepane, *issueList[index].Assignee.Login)
+		} else {
+			fmt.Fprintln(assigneepane, "No Assignee")
+		}
+	} else {
+		fmt.Fprintln(issuepane, "error")
+		fmt.Fprintln(commentpane, "error")
+		fmt.Fprintln(labelpane, "error")
+		fmt.Fprintln(milestonepane, "error")
+		fmt.Fprintln(assigneepane, "error")
 	}
 	return nil
 }
