@@ -87,7 +87,7 @@ func Login() error {
 		log.Printf("\nerror: %v\n", err)
 		return err
 	}
-	log.Printf("\nLogged into: %v\n", github.Stringify(user.Name))
+	log.Printf("\nLogged into: %v\n", github.Stringify(user))
 	return nil
 }
 
@@ -224,13 +224,28 @@ func readComments() ([]Comments, error) {
 	return comments, err
 }
 
-func Comment(repo, body string, issueNum int) (*github.IssueComment, error) {
+func Comment(repo, body string, issueNum int) (github.IssueComment, error) {
 	s := strings.Split(repo, "/")
-	err = nil
 	comment := new(github.IssueComment)
 	comment.Body = &body
-	newComment, _, err := client.Issues.CreateComment(s[0], s[1], issueNum, comment)
+	temp, _, err := client.Issues.CreateComment(s[0], s[1], issueNum, comment)
+	newComment := *temp
 	return newComment, err
+}
+
+func editComment(repo, body string, commentId int) (github.IssueComment, error) {
+	s := strings.Split(repo, "/")
+	comment := new(github.IssueComment)
+	comment.Body = &body
+	temp, _, err := client.Issues.EditComment(s[0], s[1], commentId, comment)
+	newComment := *temp
+	return newComment, err
+}
+
+func DeleteComment(repo string, commentId int) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.DeleteComment(s[0], s[1], commentId)
+	return err
 }
 
 func CreateLabel(repo, labelName string) (github.Label, error) {
@@ -241,6 +256,28 @@ func CreateLabel(repo, labelName string) (github.Label, error) {
 	newLabel := *temp
 	return newLabel, err
 }
-func AddLabel()       {}
-func DeleteComment()  {}
-func CreateMilstone() {}
+
+func AddLabel(repo, labelName string, issueNum int) ([]github.Label, error) {
+	s := strings.Split(repo, "/")
+	label := []string{labelName}
+	labels, _, err := client.Issues.AddLabelsToIssue(s[0], s[1], issueNum, label)
+	return labels, err
+}
+
+func EditLabel()   {}
+func RemoveLabel() {}
+func DeleteLabel() {}
+
+func CreateMilestone(repo, milestone string) (github.Milestone, error) {
+	s := strings.Split(repo, "/")
+	temp := new(github.Milestone)
+	temp.Title = &milestone
+	temp, _, err := client.Issues.CreateMilestone(s[0], s[1], temp)
+	ms := *temp
+	return ms, err
+}
+
+func AddMilestone()    {}
+func EditMilestone()   {}
+func RemoveMilestone() {}
+func DeleteMilestone() {}
