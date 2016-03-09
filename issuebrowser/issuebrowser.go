@@ -115,6 +115,10 @@ func layout(g *gocui.Gui) error {
 }
 
 func keybindings(g *gocui.Gui) error {
+	if err := g.SetKeybinding("", gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, scrollRight); err != nil {
 		return err
 	}
@@ -580,6 +584,31 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		fmt.Fprintln(milestonepane, "error")
 		fmt.Fprintln(assigneepane, "error")
 	}
+	return nil
+}
+
+func newIssue(g *gocui.Gui, v *gocui.View) error {
+	maxX, maxY := g.Size()
+	if issueprompt, err := g.SetView("issueprompt", maxX/4, maxY/3, maxX-(maxX/4), (maxY/3)+(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(issueprompt, "Please enter issue title")
+	}
+	if issueEd, err := g.SetView("issueEd", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		issueEd.Editable = true
+	}
+	if err := g.SetCurrentView("issueEd"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeIssue(g *gocui.Gui, v *gocui.View) error {
+
 	return nil
 }
 
