@@ -163,6 +163,22 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("commentpane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", 'j', gocui.ModNone, scrollDown); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", 'k', gocui.ModNone, scrollUp); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("labelpane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
 		return err
 	}
@@ -513,7 +529,12 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 
 		//show comments
 		for i := 0; i < (*issueList[index].Comments); i++ {
-			fmt.Fprintln(commentpane, *comments[index][i].Body)
+			fmt.Fprintln(commentpane, *comments[index][i].User.Login+" commented on "+(*comments[index][i].CreatedAt).Format("Mon Jan 2"))
+			com := *comments[index][i].Body
+			for strings.HasSuffix(com, "\n") {
+				com = com[:len(com)-2]
+			}
+			fmt.Fprintln(commentpane, "\t\t\t\t"+com+"\n")
 		}
 
 		//show labes
@@ -527,6 +548,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 
 		//show milestone
 		if issueList[index].Milestone != nil {
+			fmt.Fprintln(milestonepane, *issueList[index].Milestone.Title)
 			complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues)))
 			barWidth := (maxX / 5) - 4
 			bars := int(float64(barWidth) * complete)
