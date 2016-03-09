@@ -19,6 +19,7 @@ import (
 
 var path = "./"
 var issueList []github.Issue
+var comments [][]github.IssueComment
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -30,6 +31,7 @@ func Show() {
 	setUp()
 	timer := cron.New()
 	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
+	timer.AddFunc("0 5 * * * *", func() { comments = getComments(len(issueList)) })
 	timer.Start()
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
@@ -254,6 +256,18 @@ func getIssues() []github.Issue {
 	return iss
 }
 
+func getComments(length int) [][]github.IssueComment {
+	var com = make([][]github.IssueComment, length)
+	var err error
+	for i := 0; i < len(issueList); i++ {
+		com[i], err = gitissue.ListComments(getRepo(), (*issueList[i].Number))
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+	return com
+}
+
 func hide() {
 	cmd := exec.Command("stty", "-echo")
 	cmd.Stdin = os.Stdin
@@ -292,12 +306,14 @@ func setUp() {
 	GetLogin()
 	gitissue.Login()
 	issueList = getIssues()
+	comments = getComments(len(issueList))
 }
 
 //functions called by keypress below
 
 func refresh(g *gocui.Gui, v *gocui.View) error {
 	issueList = getIssues()
+	comments = getComments(len(issueList))
 	browser, err := g.View("browser")
 	if err != nil {
 		return err
@@ -496,13 +512,9 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		}
 
 		//show comments
-		/*comments, err := gitissue.ListComments(getRepo(), (*issueList[index].Number))
-		if err != nil {
-			log.Panic(err)
-		}
 		for i := 0; i < (*issueList[index].Comments); i++ {
-			fmt.Fprintln(commentpane, *comments[i].Body)
-		}*/
+			fmt.Fprintln(commentpane, *comments[index][i].Body)
+		}
 
 		//show labes
 		labels := issueList[index].Labels
