@@ -20,6 +20,11 @@ import (
 var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
+var tempIssueTitle string
+var tempIssueBody string
+var tempIssueAssignee string
+var tempIssueLabels = make([]string, 0)
+var entryCount = 0
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -115,6 +120,14 @@ func layout(g *gocui.Gui) error {
 }
 
 func keybindings(g *gocui.Gui) error {
+	if err := g.SetKeybinding("issueEd", gocui.KeyEnter, gocui.ModNone, nextEntry); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("issueEd", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
 		return err
 	}
@@ -314,9 +327,15 @@ func GetLogin() {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter GitHub username: ")
 		user, _ := reader.ReadString('\n')
+		if strings.HasSuffix(user, "\n") {
+			user = user[:(len(user) - 2)]
+		}
 		fmt.Print("Enter GitHub Oauth token: ")
 		hide()
 		pass, _ := reader.ReadString('\n')
+		if strings.HasSuffix(pass, "\n") {
+			pass = pass[:(len(pass) - 2)]
+		}
 		unhide()
 		gitissue.SetUp(user, pass)
 	}
@@ -593,7 +612,7 @@ func newIssue(g *gocui.Gui, v *gocui.View) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(issueprompt, "Please enter issue title")
+		fmt.Fprintln(issueprompt, "Please enter issue title\n\n\nCtrl + c to cancel")
 	}
 	if issueEd, err := g.SetView("issueEd", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -607,8 +626,76 @@ func newIssue(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-func writeIssue(g *gocui.Gui, v *gocui.View) error {
+func nextEntry(g *gocui.Gui, v *gocui.View) error {
+	issueEd, err := g.View("issueEd")
+	if err != nil {
+		return err
+	}
+	issueprompt, err := g.View("issueprompt")
+	if err != nil {
+		return err
+	}
+	switch {
+	case entryCount == 0:
+		tempIssueTitle = issueEd.Buffer()
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Please enter issue body\n(Blank for no body)\n\nCtrl + c to cancel")
+		issueEd.Clear()
+		entryCount++
+	case entryCount == 1:
+		tempIssueBody = issueEd.Buffer()
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Please enter issue assignee\n(Blank for no assignee)\n\nCtrl + c to cancel")
+		issueEd.Clear()
+		entryCount++
+	case entryCount == 2:
+		tempIssueAssignee = issueEd.Buffer()
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Please enter issue labels, label titles are comma separated\n(Blank for no labels)\n\nCtrl + c to cancel")
+		issueEd.Clear()
+		entryCount++
+	case entryCount == 3:
+		tempIssueLabels = strings.Split(issueEd.Buffer(), ",")
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Press enter to confirm entries and write out")
+		issueEd.Clear()
+		issueEd.Editable = false
+		fmt.Fprintln(issueEd, "Title: "+tempIssueTitle)
+		fmt.Fprintln(issueEd, "Body: "+tempIssueBody)
+		fmt.Fprintln(issueEd, "Assignee: "+tempIssueAssignee)
+		fmt.Fprint(issueEd, "Lables: ")
+		for i := 0; i < len(tempIssueLabels); i++ {
+			fmt.Fprintln(issueEd, tempIssueLabels[i])
+		}
+		entryCount++
+	case entryCount == 4:
+		//gitissue.MakeIssue()
+		log.Println("issue creation success")
+		err := cancel(g, v)
+		if err != nil {
+			return err
+		}
+		tempIssueTitle = ""
+		tempIssueBody = ""
+		tempIssueAssignee = ""
+		tempIssueLabels = make([]string, 0)
+		entryCount = 0
+	default:
+		fmt.Fprintln(issueprompt, "Error reading header")
+	}
+	return nil
+}
 
+func cancel(g *gocui.Gui, v *gocui.View) error {
+	if err := g.DeleteView("issueEd"); err != nil {
+		return err
+	}
+	if err := g.DeleteView("issueprompt"); err != nil {
+		return err
+	}
+	if err := g.SetCurrentView("browser"); err != nil {
+		return err
+	}
 	return nil
 }
 
