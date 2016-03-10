@@ -143,9 +143,10 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("issueEd", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
-		return err
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
+			return err
+		}
 	}
 
 	if err := g.SetKeybinding("browser", gocui.KeyPgup, gocui.ModNone, cursorTop); err != nil {
@@ -719,12 +720,13 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 }
 
 func newIssue(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
 	maxX, maxY := g.Size()
 	if issueprompt, err := g.SetView("issueprompt", maxX/4, maxY/3, maxX-(maxX/4), (maxY/3)+(maxY/6)); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(issueprompt, "Please enter issue title\n\n\nCtrl + c to cancel")
+		fmt.Fprintln(issueprompt, "Please enter issue title\n(Title is mandatory)\n\nCtrl + c to cancel")
 	}
 	if issueEd, err := g.SetView("issueEd", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -753,27 +755,40 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 	}
 	switch {
 	case entryCount == 0:
-		tempIssueTitle = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		if len(issueEd.Buffer()) >= 2 {
+			tempIssueTitle = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
 		issueprompt.Clear()
-		fmt.Fprintln(issueprompt, "Please enter issue body\n(Blank for no body)\n\nCtrl + c to cancel")
-		issueEd.Clear()
-		entryCount++
+		if tempIssueTitle == "" {
+			fmt.Fprintln(issueprompt, "Please enter issue title\n(Title is mandatory)\n\nCtrl + c to cancel")
+		} else {
+			fmt.Fprintln(issueprompt, "Please enter issue body\n(Leave blank for no body)\n\nCtrl + c to cancel")
+			issueEd.Clear()
+			entryCount++
+		}
 	case entryCount == 1:
-		tempIssueBody = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		if issueEd.Buffer() != "" {
+			tempIssueBody = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
 		issueprompt.Clear()
-		fmt.Fprintln(issueprompt, "Please enter issue assignee\n(Blank for no assignee)\n\nCtrl + c to cancel")
+		fmt.Fprintln(issueprompt, "Please enter issue assignee\n(Leave blank for no assignee)\n\nCtrl + c to cancel")
 		issueEd.Clear()
 		entryCount++
 	case entryCount == 2:
-		tempIssueAssignee = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		if issueEd.Buffer() != "" {
+			tempIssueAssignee = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
 		issueprompt.Clear()
-		fmt.Fprintln(issueprompt, "Please enter issue labels, label titles are comma separated\n(Blank for no labels)\n\nCtrl + c to cancel")
+		fmt.Fprintln(issueprompt, "Please enter issue labels, label titles are comma separated\n(Leave blank for no labels)\n\nCtrl + c to cancel")
 		issueEd.Clear()
 		entryCount++
 	case entryCount == 3:
-		tempIssueLabels = strings.Split(issueEd.Buffer()[:len(issueEd.Buffer())-2], ",")
+		if issueEd.Buffer() != "" {
+			tempIssueLabels = strings.Split(issueEd.Buffer()[:len(issueEd.Buffer())-2], ",")
+		}
 		issueprompt.Clear()
 		fmt.Fprintln(issueprompt, "Press enter to confirm entries and write out")
+		fmt.Fprintln(issueprompt, "")
 		fmt.Fprintln(issueprompt, "Press Ctrl + c to cancel")
 		issueEd.Clear()
 		issueEd.Editable = false
@@ -817,7 +832,7 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 		return err
 	}
 	entryCount = 0
-	if err := g.SetCurrentView("browser"); err != nil {
+	if err := g.SetCurrentView(previousView.Name()); err != nil {
 		return err
 	}
 	return nil
