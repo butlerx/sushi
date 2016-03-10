@@ -38,6 +38,26 @@ func write(toWrite []github.Issue, file string) error {
 	return err
 }
 
+func IsSetUp() (bool, error) {
+	_, err = os.Stat(path + ".issue")
+	if os.IsNotExist(err) {
+		return false, err
+	}
+	file, err := ioutil.ReadFile(path + ".issue/config.json")
+	if err != nil {
+		return false, err
+	} else {
+		temp := new(Config)
+		if err = json.Unmarshal(file, temp); err != nil {
+			return false, err
+		}
+		if temp.Username == "" {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
 func SetUp(user, oauth string) error {
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
