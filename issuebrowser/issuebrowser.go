@@ -20,11 +20,14 @@ import (
 var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
+
 var tempIssueTitle string
 var tempIssueBody string
 var tempIssueAssignee string
 var tempIssueLabels = make([]string, 0)
 var entryCount = 0
+
+var previousView *gocui.View
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -60,6 +63,12 @@ func Show() {
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
+	if windowChanger, err := g.SetView("windowChanger", maxX, maxY, maxX+1, maxY+1); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		windowChanger.Frame = false
+	}
 	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
 		if err != gocui.ErrUnknownView {
 			return err
@@ -122,6 +131,11 @@ func layout(g *gocui.Gui) error {
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
+			return err
+		}
+	}
 	if err := g.SetKeybinding("issueEd", gocui.KeyEnter, gocui.ModNone, nextEntry); err != nil {
 		return err
 	}
@@ -235,6 +249,19 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlR, gocui.ModNone, refresh); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowUp, gocui.ModNone, windowUp); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowDown, gocui.ModNone, windowDown); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowRight, gocui.ModNone, windowRight); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowLeft, gocui.ModNone, windowLeft); err != nil {
 		return err
 	}
 
@@ -794,6 +821,90 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 		return err
 	}
 	return nil
+}
+
+func changeWindow(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	if err := g.SetCurrentView("windowChanger"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func windowUp(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("milestonepane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("labelpane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func windowDown(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("assigneepane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("milestonepane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("assigneepane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func windowRight(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("assigneepane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("milestonepane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("milestonepane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func windowLeft(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("commentpane")
+	default:
+		return g.SetCurrentView("browser")
+	}
 }
 
 func nextWindow(g *gocui.Gui, v *gocui.View) error {
