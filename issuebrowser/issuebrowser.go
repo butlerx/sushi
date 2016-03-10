@@ -134,7 +134,31 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyPgup, gocui.ModNone, scrollTop); err != nil {
+	if err := g.SetKeybinding("browser", gocui.KeyPgup, gocui.ModNone, cursorTop); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyPgup, gocui.ModNone, scrollTop); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("browser", gocui.KeyPgdn, gocui.ModNone, cursorBottom); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyPgdn, gocui.ModNone, scrollBottom); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyEnd, gocui.ModNone, scrollEnd); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyHome, gocui.ModNone, scrollHome); err != nil {
 		return err
 	}
 
@@ -338,15 +362,46 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func scrollTop(g *gocui.Gui, v *gocui.View) error {
+	_, maxY := v.Size()
 	if v != nil {
 		ox, oy := v.Origin()
 		cx, cy := v.Cursor()
-		for oy > 0 {
+		for i := 0; i < maxY; i++ {
 			if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
 				if err := v.SetOrigin(ox, oy-1); err != nil {
 					return err
 				}
 			}
+			cy--
+			oy--
+		}
+	}
+	return nil
+}
+
+func scrollBottom(g *gocui.Gui, v *gocui.View) error {
+	_, maxY := v.Size()
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		for i := 0; i < maxY; i++ {
+			if l, err = v.Line(cy + 1); err != nil {
+				l = ""
+			}
+			if m, err = v.Line(cy + 2); err != nil {
+				m = ""
+			}
+			if l != "" || m != "" {
+				if err := v.SetCursor(cx, cy+1); err != nil {
+					ox, oy := v.Origin()
+					if err := v.SetOrigin(ox, oy+1); err != nil {
+						return err
+					}
+				}
+			}
+			cy++
 		}
 	}
 	return nil
@@ -371,6 +426,58 @@ func scrollDown(g *gocui.Gui, v *gocui.View) error {
 					return err
 				}
 			}
+		}
+	}
+	return nil
+}
+
+func scrollEnd(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		line, err := v.Line(cy)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < len(line); i++ {
+			if l, err = v.Word(cx, cy); err != nil {
+				l = ""
+			}
+			if m, err = v.Word(cx+1, cy); err != nil {
+				m = ""
+			}
+			if l != "" || m != "" {
+				ox, oy := v.Origin()
+				if err := v.SetCursor(cx+1, cy); err != nil {
+					if err := v.SetOrigin(ox+1, oy); err != nil {
+						return err
+					}
+				}
+				cx++
+			}
+		}
+	}
+	return nil
+}
+
+func scrollHome(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		ox, oy := v.Origin()
+		line, err := v.Line(cy)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < len(line); i++ {
+			if err := v.SetCursor(cx-1, cy); err != nil && ox > 0 {
+				if err := v.SetOrigin(ox-1, oy); err != nil {
+					return err
+				}
+			}
+			cx--
+			ox--
 		}
 	}
 	return nil
@@ -426,22 +533,29 @@ func scrollUp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func cursorTop(g *gocui.Gui, v *gocui.View) error {
+	if err := scrollTop(g, v); err != nil {
+		return err
+	}
+	if err := getLine(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cursorBottom(g *gocui.Gui, v *gocui.View) error {
+	if err := scrollBottom(g, v); err != nil {
+		return err
+	}
+	if err := getLine(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		cx, cy := v.Cursor()
-		var l string
-		var err error
-		if l, err = v.Line(cy + 1); err != nil {
-			l = ""
-		}
-		if l != "" {
-			if err := v.SetCursor(cx, cy+1); err != nil {
-				ox, oy := v.Origin()
-				if err := v.SetOrigin(ox, oy+1); err != nil {
-					return err
-				}
-			}
-		}
+	if err := scrollDown(g, v); err != nil {
+		return err
 	}
 	if err := getLine(g, v); err != nil {
 		return err
@@ -450,14 +564,8 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 }
 
 func cursorUp(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		ox, oy := v.Origin()
-		cx, cy := v.Cursor()
-		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
-			if err := v.SetOrigin(ox, oy-1); err != nil {
-				return err
-			}
-		}
+	if err := scrollUp(g, v); err != nil {
+		return err
 	}
 	if err := getLine(g, v); err != nil {
 		return err
