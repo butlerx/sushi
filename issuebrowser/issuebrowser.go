@@ -120,6 +120,8 @@ func layout(g *gocui.Gui) error {
 }
 
 func keybindings(g *gocui.Gui) error {
+	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	if err := g.SetKeybinding("issueEd", gocui.KeyEnter, gocui.ModNone, nextEntry); err != nil {
 		return err
 	}
@@ -132,51 +134,7 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("browser", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("issuepane", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("browser", 'h', gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("issuepane", 'h', gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", 'h', gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", 'h', gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", 'h', gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", 'h', gocui.ModNone, scrollLeft); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyPgup, gocui.ModNone, scrollTop); err != nil {
 		return err
 	}
 
@@ -184,8 +142,20 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'l', gocui.ModNone, scrollRight); err != nil {
+			return err
+		}
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, scrollLeft); err != nil {
 		return err
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'h', gocui.ModNone, scrollLeft); err != nil {
+			return err
+		}
 	}
 
 	if err := g.SetKeybinding("browser", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
@@ -204,132 +174,40 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("issuepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+			return err
+		}
 	}
 
-	if err := g.SetKeybinding("issuepane", 'j', gocui.ModNone, scrollDown); err != nil {
-		return err
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], 'j', gocui.ModNone, scrollDown); err != nil {
+			return err
+		}
 	}
 
-	if err := g.SetKeybinding("issuepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+			return err
+		}
 	}
 
-	if err := g.SetKeybinding("issuepane", 'k', gocui.ModNone, scrollUp); err != nil {
-		return err
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], 'k', gocui.ModNone, scrollUp); err != nil {
+			return err
+		}
 	}
 
-	if err := g.SetKeybinding("commentpane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'q', gocui.ModNone, quit); err != nil {
+			return err
+		}
 	}
 
-	if err := g.SetKeybinding("commentpane", 'j', gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", 'k', gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", 'j', gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", 'k', gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", 'j', gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", 'k', gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", 'j', gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", 'k', gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("browser", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("issuepane", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", 'q', gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("browser", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("issuepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("commentpane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("labelpane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("milestonepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
-		return err
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+			return err
+		}
 	}
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlR, gocui.ModNone, refresh); err != nil {
@@ -457,6 +335,21 @@ func refresh(g *gocui.Gui, v *gocui.View) error {
 
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
+}
+
+func scrollTop(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		ox, oy := v.Origin()
+		cx, cy := v.Cursor()
+		for oy > 0 {
+			if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
+				if err := v.SetOrigin(ox, oy-1); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func scrollDown(g *gocui.Gui, v *gocui.View) error {
@@ -768,7 +661,7 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 		}
 		err = cancel(g, v)
 		if err != nil {
-			// return err
+			return err
 		}
 		tempIssueTitle = ""
 		tempIssueBody = ""
