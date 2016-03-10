@@ -180,20 +180,8 @@ func Issues(repo string) ([]github.Issue, error) {
 	return issues, err
 }
 
-func Repos() ([]github.Repository, error) {
-	repos, _, err := client.Repositories.List("", nil)
-	return repos, err
-}
-
-func OrgsList() ([]github.Organization, error) {
-	log.Println(conf.Username)
-	orgs, _, err := client.Organizations.List(conf.Username, nil)
-	return orgs, err
-}
-
 func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
 	s := strings.Split(repo, "/")
-	err = nil
 	newIssue := new(github.Issue)
 	state := "open"
 	if milestone == 0 {
@@ -214,6 +202,51 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 	} else {
 		return newIssue, err
 	}
+}
+
+func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
+	s := strings.Split(repo, "/")
+	issueNum := *oldIssue.Number
+	issue := new(github.IssueRequest)
+	var labels []string
+	for i := 0; i < len(oldIssue.Labels); i++ {
+		var label string
+		label = oldIssue.Labels[i].String()
+		labels = append(labels, label)
+	}
+	issue.Labels = &labels
+	issue.Title = oldIssue.Title
+	issue.Body = oldIssue.Body
+	issue.Assignee = oldIssue.Assignee.Login
+	issue.State = oldIssue.State
+	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return updatedIssue, err
+}
+
+func CloseIssue(repo string, issue github.Issue) (*github.Issue, error) {
+	temp := "closed"
+	issue.State = &temp
+	closedIssue, err := EditIssue(repo, issue)
+	return closedIssue, err
+}
+
+func OpenIssue(repo string, issue github.Issue) (*github.Issue, error) {
+	temp := "open"
+	issue.State = &temp
+	closedIssue, err := EditIssue(repo, issue)
+	return closedIssue, err
+}
+
+func LockIssue(repo string, issueNum int) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.Lock(s[0], s[1], issueNum)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return err
 }
 
 func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
@@ -321,3 +354,14 @@ func AddMilestone()    {}
 func EditMilestone()   {}
 func RemoveMilestone() {}
 func DeleteMilestone() {}
+
+func Repos() ([]github.Repository, error) {
+	repos, _, err := client.Repositories.List("", nil)
+	return repos, err
+}
+
+func OrgsList() ([]github.Organization, error) {
+	log.Println(conf.Username)
+	orgs, _, err := client.Organizations.List(conf.Username, nil)
+	return orgs, err
+}
