@@ -132,19 +132,59 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("browser", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("issuepane", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("milestonepane", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("assigneepane", 'l', gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("browser", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("issuepane", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("milestonepane", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("assigneepane", 'h', gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, scrollRight); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("", 'l', gocui.ModNone, scrollRight); err != nil {
-		return err
-	}
-
 	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, scrollLeft); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", 'h', gocui.ModNone, scrollLeft); err != nil {
 		return err
 	}
 
@@ -244,11 +284,51 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("", 'q', gocui.ModNone, quit); err != nil {
+	if err := g.SetKeybinding("browser", 'q', gocui.ModNone, quit); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+	if err := g.SetKeybinding("issuepane", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("milestonepane", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("assigneepane", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("browser", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("issuepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("milestonepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("assigneepane", gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
 		return err
 	}
 
@@ -545,6 +625,10 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 			if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
 				fmt.Fprintln(issuepane, *issueList[index].Title)
 				fmt.Fprintln(issuepane, "")
+				if *issueList[index].Body != "" {
+					fmt.Fprintln(issuepane, *issueList[index].Body)
+					fmt.Fprintln(issuepane, "")
+				}
 				fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
 				break
 			}
@@ -635,29 +719,34 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 	if err != nil {
 		return err
 	}
+	ox, oy := issueEd.Origin()
+	if err := issueEd.SetCursor(ox, oy); err != nil {
+		return err
+	}
 	switch {
 	case entryCount == 0:
-		tempIssueTitle = issueEd.Buffer()
+		tempIssueTitle = issueEd.Buffer()[:len(issueEd.Buffer())-2]
 		issueprompt.Clear()
 		fmt.Fprintln(issueprompt, "Please enter issue body\n(Blank for no body)\n\nCtrl + c to cancel")
 		issueEd.Clear()
 		entryCount++
 	case entryCount == 1:
-		tempIssueBody = issueEd.Buffer()
+		tempIssueBody = issueEd.Buffer()[:len(issueEd.Buffer())-2]
 		issueprompt.Clear()
 		fmt.Fprintln(issueprompt, "Please enter issue assignee\n(Blank for no assignee)\n\nCtrl + c to cancel")
 		issueEd.Clear()
 		entryCount++
 	case entryCount == 2:
-		tempIssueAssignee = issueEd.Buffer()
+		tempIssueAssignee = issueEd.Buffer()[:len(issueEd.Buffer())-2]
 		issueprompt.Clear()
 		fmt.Fprintln(issueprompt, "Please enter issue labels, label titles are comma separated\n(Blank for no labels)\n\nCtrl + c to cancel")
 		issueEd.Clear()
 		entryCount++
 	case entryCount == 3:
-		tempIssueLabels = strings.Split(issueEd.Buffer(), ",")
+		tempIssueLabels = strings.Split(issueEd.Buffer()[:len(issueEd.Buffer())-2], ",")
 		issueprompt.Clear()
 		fmt.Fprintln(issueprompt, "Press enter to confirm entries and write out")
+		fmt.Fprintln(issueprompt, "Press Ctrl + c to cancel")
 		issueEd.Clear()
 		issueEd.Editable = false
 		fmt.Fprintln(issueEd, "Title: "+tempIssueTitle)
@@ -665,21 +754,27 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 		fmt.Fprintln(issueEd, "Assignee: "+tempIssueAssignee)
 		fmt.Fprint(issueEd, "Lables: ")
 		for i := 0; i < len(tempIssueLabels); i++ {
-			fmt.Fprintln(issueEd, tempIssueLabels[i])
+			if i == 0 {
+				fmt.Fprintln(issueEd, tempIssueLabels[i])
+			} else {
+				fmt.Fprintln(issueEd, "        "+tempIssueLabels[i])
+			}
 		}
 		entryCount++
 	case entryCount == 4:
-		//gitissue.MakeIssue()
-		log.Println("issue creation success")
-		err := cancel(g, v)
+		_, err := gitissue.MakeIssue(getRepo(), tempIssueTitle, tempIssueBody, tempIssueAssignee, 0, tempIssueLabels)
 		if err != nil {
 			return err
+		}
+		err = cancel(g, v)
+		if err != nil {
+			// return err
 		}
 		tempIssueTitle = ""
 		tempIssueBody = ""
 		tempIssueAssignee = ""
 		tempIssueLabels = make([]string, 0)
-		entryCount = 0
+		refresh(g, v)
 	default:
 		fmt.Fprintln(issueprompt, "Error reading header")
 	}
@@ -693,6 +788,7 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 	if err := g.DeleteView("issueprompt"); err != nil {
 		return err
 	}
+	entryCount = 0
 	if err := g.SetCurrentView("browser"); err != nil {
 		return err
 	}
