@@ -14,10 +14,20 @@ import (
 	"github.com/butlerx/AgileGit/gitissue"
 	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
+	"github.com/robfig/cron"
 )
 
 var path = "./"
 var issueList []github.Issue
+var comments [][]github.IssueComment
+
+var tempIssueTitle string
+var tempIssueBody string
+var tempIssueAssignee string
+var tempIssueLabels = make([]string, 0)
+var entryCount = 0
+
+var previousView *gocui.View
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -27,6 +37,10 @@ func PassArgs(s string) {
 //Show is the main display function for the issue browser
 func Show() {
 	setUp()
+	timer := cron.New()
+	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
+	timer.AddFunc("0 5 * * * *", func() { comments = getComments(len(issueList)) })
+	timer.Start()
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -44,10 +58,17 @@ func Show() {
 	if err := window.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
+	timer.Stop()
 }
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
+	if windowChanger, err := g.SetView("windowChanger", maxX, maxY, maxX+1, maxY+1); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		windowChanger.Frame = false
+	}
 	if browser, err := g.SetView("browser", -1, -1, maxX/3, maxY); err != nil { //draw left pane
 		if err != gocui.ErrUnknownView {
 			return err
@@ -90,13 +111,6 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		fmt.Fprintln(assigneepane, "Assignee")
-
-	}
-	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
 		browser, err := g.View("browser")
 		if err != nil {
 			return err
@@ -105,11 +119,89 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
+	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"q = Quit, "+"\t"+"Ctrl+R = Refresh")
+	}
 	return nil
 }
 
 func keybindings(g *gocui.Gui) error {
+	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
+			return err
+		}
+	}
+	if err := g.SetKeybinding("issueEd", gocui.KeyEnter, gocui.ModNone, nextEntry); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("issueEd", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("browser", gocui.KeyPgup, gocui.ModNone, cursorTop); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyPgup, gocui.ModNone, scrollTop); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("browser", gocui.KeyPgdn, gocui.ModNone, cursorBottom); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyPgdn, gocui.ModNone, scrollBottom); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyEnd, gocui.ModNone, scrollEnd); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyHome, gocui.ModNone, scrollHome); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, scrollRight); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'l', gocui.ModNone, scrollRight); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, scrollLeft); err != nil {
+		return err
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'h', gocui.ModNone, scrollLeft); err != nil {
+			return err
+		}
+	}
+
 	if err := g.SetKeybinding("browser", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("browser", 'j', gocui.ModNone, cursorDown); err != nil {
 		return err
 	}
 
@@ -117,47 +209,60 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	if err := g.SetKeybinding("issuepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+	if err := g.SetKeybinding("browser", 'k', gocui.ModNone, cursorUp); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("issuepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], 'j', gocui.ModNone, scrollDown); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], 'k', gocui.ModNone, scrollUp); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], 'q', gocui.ModNone, quit); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyTab, gocui.ModNone, nextWindow); err != nil {
+			return err
+		}
+	}
+
+	if err := g.SetKeybinding("", gocui.KeyCtrlR, gocui.ModNone, refresh); err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("labelpane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowUp, gocui.ModNone, windowUp); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("labelpane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowDown, gocui.ModNone, windowDown); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("milestonepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowRight, gocui.ModNone, windowRight); err != nil {
 		return err
 	}
-
-	if err := g.SetKeybinding("milestonepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", gocui.KeyArrowDown, gocui.ModNone, scrollDown); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("assigneepane", gocui.KeyArrowUp, gocui.ModNone, scrollUp); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, moveRight); err != nil {
-		return err
-	}
-
-	if err := g.SetKeybinding("", gocui.KeyArrowLeft, gocui.ModNone, moveLeft); err != nil {
+	if err := g.SetKeybinding("windowChanger", gocui.KeyArrowLeft, gocui.ModNone, windowLeft); err != nil {
 		return err
 	}
 
@@ -194,6 +299,18 @@ func getIssues() []github.Issue {
 	return iss
 }
 
+func getComments(length int) [][]github.IssueComment {
+	var com = make([][]github.IssueComment, length)
+	var err error
+	for i := 0; i < len(issueList); i++ {
+		com[i], err = gitissue.ListComments(getRepo(), (*issueList[i].Number))
+		if err != nil {
+			log.Panic(err)
+		}
+	}
+	return com
+}
+
 func hide() {
 	cmd := exec.Command("stty", "-echo")
 	cmd.Stdin = os.Stdin
@@ -220,9 +337,15 @@ func GetLogin() {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter GitHub username: ")
 		user, _ := reader.ReadString('\n')
+		if strings.HasSuffix(user, "\n") {
+			user = user[:(len(user) - 2)]
+		}
 		fmt.Print("Enter GitHub Oauth token: ")
 		hide()
 		pass, _ := reader.ReadString('\n')
+		if strings.HasSuffix(pass, "\n") {
+			pass = pass[:(len(pass) - 2)]
+		}
 		unhide()
 		gitissue.SetUp(user, pass)
 	}
@@ -232,12 +355,84 @@ func setUp() {
 	GetLogin()
 	gitissue.Login()
 	issueList = getIssues()
+	comments = getComments(len(issueList))
 }
 
 //functions called by keypress below
 
+func refresh(g *gocui.Gui, v *gocui.View) error {
+	issueList = getIssues()
+	comments = getComments(len(issueList))
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	current := g.CurrentView()
+	if err := g.SetCurrentView("browser"); err != nil {
+		return err
+	}
+	browser.Clear()
+	for i := 0; i < len(issueList); i++ {
+		fmt.Fprint(browser, *issueList[i].Number)
+		fmt.Fprintln(browser, ": "+(*issueList[i].Title))
+	}
+	if err := getLine(g, browser); err != nil {
+		return err
+	}
+	if err := g.SetCurrentView(current.Name()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
+}
+
+func scrollTop(g *gocui.Gui, v *gocui.View) error {
+	_, maxY := v.Size()
+	if v != nil {
+		ox, oy := v.Origin()
+		cx, cy := v.Cursor()
+		for i := 0; i < maxY; i++ {
+			if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
+				if err := v.SetOrigin(ox, oy-1); err != nil {
+					return err
+				}
+			}
+			cy--
+			oy--
+		}
+	}
+	return nil
+}
+
+func scrollBottom(g *gocui.Gui, v *gocui.View) error {
+	_, maxY := v.Size()
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		for i := 0; i < maxY; i++ {
+			if l, err = v.Line(cy + 1); err != nil {
+				l = ""
+			}
+			if m, err = v.Line(cy + 2); err != nil {
+				m = ""
+			}
+			if l != "" || m != "" {
+				if err := v.SetCursor(cx, cy+1); err != nil {
+					ox, oy := v.Origin()
+					if err := v.SetOrigin(ox, oy+1); err != nil {
+						return err
+					}
+				}
+			}
+			cy++
+		}
+	}
+	return nil
 }
 
 func scrollDown(g *gocui.Gui, v *gocui.View) error {
@@ -264,6 +459,95 @@ func scrollDown(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func scrollEnd(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		line, err := v.Line(cy)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < len(line); i++ {
+			if l, err = v.Word(cx, cy); err != nil {
+				l = ""
+			}
+			if m, err = v.Word(cx+1, cy); err != nil {
+				m = ""
+			}
+			if l != "" || m != "" {
+				ox, oy := v.Origin()
+				if err := v.SetCursor(cx+1, cy); err != nil {
+					if err := v.SetOrigin(ox+1, oy); err != nil {
+						return err
+					}
+				}
+				cx++
+			}
+		}
+	}
+	return nil
+}
+
+func scrollHome(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		ox, oy := v.Origin()
+		line, err := v.Line(cy)
+		if err != nil {
+			return err
+		}
+		for i := 0; i < len(line); i++ {
+			if err := v.SetCursor(cx-1, cy); err != nil && ox > 0 {
+				if err := v.SetOrigin(ox-1, oy); err != nil {
+					return err
+				}
+			}
+			cx--
+			ox--
+		}
+	}
+	return nil
+}
+
+func scrollRight(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		if l, err = v.Word(cx, cy); err != nil {
+			l = ""
+		}
+		if m, err = v.Word(cx+1, cy); err != nil {
+			m = ""
+		}
+		if l != "" || m != "" {
+			ox, oy := v.Origin()
+			if err := v.SetCursor(cx+1, cy); err != nil {
+				if err := v.SetOrigin(ox+1, oy); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func scrollLeft(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		ox, oy := v.Origin()
+		if err := v.SetCursor(cx-1, cy); err != nil && ox > 0 {
+			if err := v.SetOrigin(ox-1, oy); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func scrollUp(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		ox, oy := v.Origin()
@@ -277,22 +561,29 @@ func scrollUp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func cursorTop(g *gocui.Gui, v *gocui.View) error {
+	if err := scrollTop(g, v); err != nil {
+		return err
+	}
+	if err := getLine(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cursorBottom(g *gocui.Gui, v *gocui.View) error {
+	if err := scrollBottom(g, v); err != nil {
+		return err
+	}
+	if err := getLine(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		cx, cy := v.Cursor()
-		var l string
-		var err error
-		if l, err = v.Line(cy + 1); err != nil {
-			l = ""
-		}
-		if l != "" {
-			if err := v.SetCursor(cx, cy+1); err != nil {
-				ox, oy := v.Origin()
-				if err := v.SetOrigin(ox, oy+1); err != nil {
-					return err
-				}
-			}
-		}
+	if err := scrollDown(g, v); err != nil {
+		return err
 	}
 	if err := getLine(g, v); err != nil {
 		return err
@@ -301,14 +592,8 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 }
 
 func cursorUp(g *gocui.Gui, v *gocui.View) error {
-	if v != nil {
-		ox, oy := v.Origin()
-		cx, cy := v.Cursor()
-		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
-			if err := v.SetOrigin(ox, oy-1); err != nil {
-				return err
-			}
-		}
+	if err := scrollUp(g, v); err != nil {
+		return err
 	}
 	if err := getLine(g, v); err != nil {
 		return err
@@ -326,147 +611,331 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		l = ""
 	}
 
-	if err := g.DeleteView("issuepane"); err != nil {
+	issuepane, err := g.View("issuepane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("labelpane"); err != nil {
+	commentpane, err := g.View("commentpane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("milestonepane"); err != nil {
+	labelpane, err := g.View("labelpane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("assigneepane"); err != nil {
+	milestonepane, err := g.View("milestonepane")
+	if err != nil {
 		return err
 	}
-	if err := g.DeleteView("helppane"); err != nil {
+	assigneepane, err := g.View("assigneepane")
+	if err != nil {
 		return err
 	}
 
-	maxX, maxY := g.Size()
-	if issuepane, err := g.SetView("issuepane", maxX/3, -1, maxX-(maxX/5), maxY/4); err != nil { //draw centre pane
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		issuepane.Wrap = true
-		if l != "" {
-			issNum := strings.Split(l, ":")
-			for ; index < len(issueList); index++ {
-				if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
-					fmt.Fprintln(issuepane, *issueList[index].Title)
+	maxX, _ := g.Size()
+	issuepane.Clear()
+	commentpane.Clear()
+	labelpane.Clear()
+	milestonepane.Clear()
+	assigneepane.Clear()
+
+	fmt.Fprintln(commentpane, "Comments")
+	fmt.Fprintln(commentpane, "")
+	fmt.Fprintln(labelpane, "Labels")
+	fmt.Fprintln(labelpane, "")
+	fmt.Fprintln(milestonepane, "Milestone")
+	fmt.Fprintln(milestonepane, "")
+	fmt.Fprintln(assigneepane, "Assignee")
+	fmt.Fprintln(assigneepane, "")
+	if l != "" {
+		//show issue body
+		issNum := strings.Split(l, ":")
+		for ; index < len(issueList); index++ {
+			if (issNum[0]) == (strconv.Itoa(*issueList[index].Number)) {
+				fmt.Fprintln(issuepane, *issueList[index].Title)
+				fmt.Fprintln(issuepane, "")
+				if *issueList[index].Body != "" {
+					fmt.Fprintln(issuepane, *issueList[index].Body)
 					fmt.Fprintln(issuepane, "")
-					fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
-
-					break
 				}
+				fmt.Fprintln(issuepane, "#"+(strconv.Itoa(*issueList[index].Number))+" opened on "+((*issueList[index].CreatedAt).Format(time.UnixDate))+" by "+(*(*issueList[index].User).Login))
+				break
 			}
-		} else {
-			fmt.Fprintln(issuepane, "error")
 		}
-	}
-	if commentpane, err := g.SetView("commentpane", maxX/3, maxY/4, maxX-(maxX/5), maxY-2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		commentpane.Wrap = true
-		fmt.Fprintln(commentpane, "Comments")
-		fmt.Fprintln(commentpane, "")
-		comments, err := gitissue.ListComments(getRepo(), (*issueList[index].Number))
-		if err != nil {
-			log.Panic(err)
-		}
+
+		//show comments
 		for i := 0; i < (*issueList[index].Comments); i++ {
-			fmt.Fprintln(commentpane, *comments[i].Body)
+			fmt.Fprintln(commentpane, *comments[index][i].User.Login+" commented on "+(*comments[index][i].CreatedAt).Format("Mon Jan 2"))
+			com := *comments[index][i].Body
+			for strings.HasSuffix(com, "\n") {
+				com = com[:len(com)-2]
+			}
+			fmt.Fprintln(commentpane, "\t\t\t\t"+com+"\n")
 		}
-	}
 
-	if labelpane, err := g.SetView("labelpane", maxX-(maxX/5), -1, maxX, maxY/3); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		labelpane.Wrap = true
+		//show labes
 		labels := issueList[index].Labels
-		if l != "" {
-			fmt.Fprintln(labelpane, "Labels")
-			fmt.Fprintln(labelpane, "")
-			for i := 0; i < len(labels); i++ {
-				fmt.Fprintln(labelpane, *labels[i].Name)
-			}
-		} else {
-			fmt.Fprintln(labelpane, "error")
+		if len(labels) == 0 {
+			fmt.Fprintln(labelpane, "No Labels")
 		}
-	}
-	if milestonepane, err := g.SetView("milestonepane", maxX-(maxX/5), maxY/3, maxX, maxY/3*2); err != nil { //draw milestone pane
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		if l != "" {
-			fmt.Fprintln(milestonepane, "Milestone")
-			fmt.Fprintln(milestonepane, "")
-			if issueList[index].Milestone != nil {
-				complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues))) * 100
-				fmt.Fprintln(milestonepane, (strconv.FormatFloat(complete, 'f', 0, 64))+"%")
-			} else {
-				fmt.Fprintln(milestonepane, "No Milestone")
-			}
-		} else {
-			fmt.Fprintln(milestonepane, "error")
-		}
-	}
-	if assigneepane, err := g.SetView("assigneepane", maxX-(maxX/5), maxY/3*2, maxX, maxY-2); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
-		}
-		if l != "" {
-			fmt.Fprintln(assigneepane, "Assignee")
-			fmt.Fprintln(assigneepane, "")
-			if issueList[index].Assignee != nil {
-				fmt.Fprintln(assigneepane, *issueList[index].Assignee.Login)
-			} else {
-				fmt.Fprintln(assigneepane, "No Assignee")
-			}
-		} else {
-			fmt.Fprintln(assigneepane, "error")
+		for i := 0; i < len(labels); i++ {
+			fmt.Fprintln(labelpane, *labels[i].Name)
 		}
 
-	}
-	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
-		if err != gocui.ErrUnknownView {
-			return err
+		//show milestone
+		if issueList[index].Milestone != nil {
+			fmt.Fprintln(milestonepane, *issueList[index].Milestone.Title)
+			complete := (float64(*issueList[index].Milestone.ClosedIssues) / (float64(*issueList[index].Milestone.OpenIssues) + float64(*issueList[index].Milestone.ClosedIssues)))
+			barWidth := (maxX / 5) - 4
+			bars := int(float64(barWidth) * complete)
+			gaps := barWidth - bars
+			fmt.Fprint(milestonepane, "[")
+			for i := 0; i < bars; i++ {
+				fmt.Fprint(milestonepane, "|")
+			}
+			for i := 0; i < gaps; i++ {
+				fmt.Fprint(milestonepane, " ")
+			}
+			fmt.Fprintln(milestonepane, "]")
+			complete = complete * 100
+			fmt.Fprintln(milestonepane, (strconv.FormatFloat(complete, 'f', 0, 64))+"%")
+		} else {
+			fmt.Fprintln(milestonepane, "No Milestone")
 		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"Ctrl+C = Quit")
+
+		//show assignee
+		if issueList[index].Assignee != nil {
+			fmt.Fprintln(assigneepane, *issueList[index].Assignee.Login)
+		} else {
+			fmt.Fprintln(assigneepane, "No Assignee")
+		}
+	} else {
+		fmt.Fprintln(issuepane, "error")
+		fmt.Fprintln(commentpane, "error")
+		fmt.Fprintln(labelpane, "error")
+		fmt.Fprintln(milestonepane, "error")
+		fmt.Fprintln(assigneepane, "error")
 	}
 	return nil
 }
 
-func moveRight(g *gocui.Gui, v *gocui.View) error {
+func newIssue(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	maxX, maxY := g.Size()
+	if issueprompt, err := g.SetView("issueprompt", maxX/4, maxY/3, maxX-(maxX/4), (maxY/3)+(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(issueprompt, "Please enter issue title\n(Title is mandatory)\n\nCtrl + c to cancel")
+	}
+	if issueEd, err := g.SetView("issueEd", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		issueEd.Editable = true
+	}
+	if err := g.SetCurrentView("issueEd"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func nextEntry(g *gocui.Gui, v *gocui.View) error {
+	issueEd, err := g.View("issueEd")
+	if err != nil {
+		return err
+	}
+	issueprompt, err := g.View("issueprompt")
+	if err != nil {
+		return err
+	}
+	ox, oy := issueEd.Origin()
+	if err := issueEd.SetCursor(ox, oy); err != nil {
+		return err
+	}
 	switch {
-	case v == nil || v.Name() == "assigneepane":
-		return g.SetCurrentView("browser")
-	case v.Name() == "browser":
-		return g.SetCurrentView("issuepane")
-	case v.Name() == "issuepane":
-		return g.SetCurrentView("labelpane")
-	case v.Name() == "labelpane":
+	case entryCount == 0:
+		if len(issueEd.Buffer()) >= 2 {
+			tempIssueTitle = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
+		issueprompt.Clear()
+		if tempIssueTitle == "" {
+			fmt.Fprintln(issueprompt, "Please enter issue title\n(Title is mandatory)\n\nCtrl + c to cancel")
+		} else {
+			fmt.Fprintln(issueprompt, "Please enter issue body\n(Leave blank for no body)\n\nCtrl + c to cancel")
+			issueEd.Clear()
+			entryCount++
+		}
+	case entryCount == 1:
+		if issueEd.Buffer() != "" {
+			tempIssueBody = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Please enter issue assignee\n(Leave blank for no assignee)\n\nCtrl + c to cancel")
+		issueEd.Clear()
+		entryCount++
+	case entryCount == 2:
+		if issueEd.Buffer() != "" {
+			tempIssueAssignee = issueEd.Buffer()[:len(issueEd.Buffer())-2]
+		}
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Please enter issue labels, label titles are comma separated\n(Leave blank for no labels)\n\nCtrl + c to cancel")
+		issueEd.Clear()
+		entryCount++
+	case entryCount == 3:
+		if issueEd.Buffer() != "" {
+			tempIssueLabels = strings.Split(issueEd.Buffer()[:len(issueEd.Buffer())-2], ",")
+		}
+		issueprompt.Clear()
+		fmt.Fprintln(issueprompt, "Press enter to confirm entries and write out")
+		fmt.Fprintln(issueprompt, "")
+		fmt.Fprintln(issueprompt, "Press Ctrl + c to cancel")
+		issueEd.Clear()
+		issueEd.Editable = false
+		fmt.Fprintln(issueEd, "Title: "+tempIssueTitle)
+		fmt.Fprintln(issueEd, "Body: "+tempIssueBody)
+		fmt.Fprintln(issueEd, "Assignee: "+tempIssueAssignee)
+		fmt.Fprint(issueEd, "Lables: ")
+		for i := 0; i < len(tempIssueLabels); i++ {
+			if i == 0 {
+				fmt.Fprintln(issueEd, tempIssueLabels[i])
+			} else {
+				fmt.Fprintln(issueEd, "        "+tempIssueLabels[i])
+			}
+		}
+		entryCount++
+	case entryCount == 4:
+		_, err := gitissue.MakeIssue(getRepo(), tempIssueTitle, tempIssueBody, tempIssueAssignee, 0, tempIssueLabels)
+		if err != nil {
+			return err
+		}
+		err = cancel(g, v)
+		if err != nil {
+			return err
+		}
+		tempIssueTitle = ""
+		tempIssueBody = ""
+		tempIssueAssignee = ""
+		tempIssueLabels = make([]string, 0)
+		refresh(g, v)
+	default:
+		fmt.Fprintln(issueprompt, "Error reading header")
+	}
+	return nil
+}
+
+func cancel(g *gocui.Gui, v *gocui.View) error {
+	if err := g.DeleteView("issueEd"); err != nil {
+		return err
+	}
+	if err := g.DeleteView("issueprompt"); err != nil {
+		return err
+	}
+	entryCount = 0
+	if err := g.SetCurrentView(previousView.Name()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func changeWindow(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	if err := g.SetCurrentView("windowChanger"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func windowUp(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
 		return g.SetCurrentView("milestonepane")
-	case v.Name() == "milestonepane":
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("labelpane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func windowDown(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("assigneepane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("milestonepane")
+	case previousView.Name() == "milestonepane":
 		return g.SetCurrentView("assigneepane")
 	default:
 		return g.SetCurrentView("browser")
 	}
 }
 
-func moveLeft(g *gocui.Gui, v *gocui.View) error {
+func windowRight(g *gocui.Gui, v *gocui.View) error {
 	switch {
-	case v == nil || v.Name() == "issuepane":
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("assigneepane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("milestonepane")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("labelpane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("milestonepane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func windowLeft(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case previousView == nil || previousView.Name() == "assigneepane":
+		return g.SetCurrentView("commentpane")
+	case previousView.Name() == "browser":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "issuepane":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "commentpane":
+		return g.SetCurrentView("browser")
+	case previousView.Name() == "labelpane":
+		return g.SetCurrentView("issuepane")
+	case previousView.Name() == "milestonepane":
+		return g.SetCurrentView("commentpane")
+	default:
+		return g.SetCurrentView("browser")
+	}
+}
+
+func nextWindow(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case v == nil || v.Name() == "assigneepane":
 		return g.SetCurrentView("browser")
 	case v.Name() == "browser":
-		return g.SetCurrentView("assigneepane")
-	case v.Name() == "assigneepane":
-		return g.SetCurrentView("milestonepane")
-	case v.Name() == "milestonepane":
+		return g.SetCurrentView("issuepane")
+	case v.Name() == "issuepane":
+		return g.SetCurrentView("commentpane")
+	case v.Name() == "commentpane":
 		return g.SetCurrentView("labelpane")
 	case v.Name() == "labelpane":
-		return g.SetCurrentView("issuepane")
+		return g.SetCurrentView("milestonepane")
+	case v.Name() == "milestonepane":
+		return g.SetCurrentView("assigneepane")
 	default:
 		return g.SetCurrentView("browser")
 	}
