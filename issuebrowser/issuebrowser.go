@@ -209,6 +209,15 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], '0', gocui.ModNone, scrollHome); err != nil {
+			return err
+		}
+		if err := g.SetKeybinding(mainWindows[i], '$', gocui.ModNone, scrollEnd); err != nil {
+			return err
+		}
+	}
+
 	if err := g.SetKeybinding("", gocui.KeyArrowRight, gocui.ModNone, scrollRight); err != nil {
 		return err
 	}
@@ -323,6 +332,14 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 	if err := g.SetKeybinding("windowTabber", 'g', gocui.ModNone, scrollTop); err != nil {
+		return err
+	}
+	for i := 0; i < len(displayWindows); i++ {
+		if err := g.SetKeybinding(displayWindows[i], 'G', gocui.ModNone, scrollBottom); err != nil {
+			return err
+		}
+	}
+	if err := g.SetKeybinding("browser", 'G', gocui.ModNone, scrollBottomGet); err != nil {
 		return err
 	}
 
@@ -459,6 +476,59 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func scrollTop(g *gocui.Gui, v *gocui.View) error {
+	if previousView.Name() == "browser" {
+		err := scrollTopGet(g, v)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+		if previousView != nil {
+			if err := previousView.SetOrigin(0, 0); err != nil {
+				return err
+			}
+			if err := previousView.SetCursor(0, 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func scrollBottom(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		cx, cy := v.Cursor()
+		var l string
+		var m string
+		var err error
+		if l, err = v.Line(cy + 1); err != nil {
+			l = ""
+		}
+		if m, err = v.Line(cy + 2); err != nil {
+			m = ""
+		}
+		for l != "" || m != "" {
+			if err := v.SetCursor(cx, cy+1); err != nil {
+				ox, oy := v.Origin()
+				if err := v.SetOrigin(ox, oy+1); err != nil {
+					return err
+				}
+			}
+			cy++
+			if l, err = v.Line(cy + 1); err != nil {
+				l = ""
+			}
+			if m, err = v.Line(cy + 2); err != nil {
+				m = ""
+			}
+		}
+	}
+	return nil
+}
+
+func scrollTopGet(g *gocui.Gui, v *gocui.View) error {
 	if err := g.SetCurrentView(previousView.Name()); err != nil {
 		return err
 	}
@@ -470,18 +540,6 @@ func scrollTop(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 	}
-	return nil
-}
-
-func scrollBottom(g *gocui.Gui, v *gocui.View) error {
-
-	return nil
-}
-
-func scrollTopGet(g *gocui.Gui, v *gocui.View) error {
-	if err := scrollTop(g, v); err != nil {
-		return err
-	}
 	if err := getLine(g, previousView); err != nil {
 		return err
 	}
@@ -489,6 +547,12 @@ func scrollTopGet(g *gocui.Gui, v *gocui.View) error {
 }
 
 func scrollBottomGet(g *gocui.Gui, v *gocui.View) error {
+	if err := scrollBottom(g, v); err != nil {
+		return err
+	}
+	if err := getLine(g, v); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1115,6 +1179,9 @@ func toggleIssues(g *gocui.Gui, v *gocui.View) error {
 		return err
 	}
 	if err := browser.SetCursor(0, 0); err != nil {
+		return err
+	}
+	if err := getLine(g, browser); err != nil {
 		return err
 	}
 	return nil
