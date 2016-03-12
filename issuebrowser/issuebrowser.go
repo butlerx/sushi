@@ -15,11 +15,136 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
 	"github.com/robfig/cron"
+	"sort"
 )
 
 var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
+
+type byNumber []github.Issue
+type byTitle []github.Issue
+type byBody []github.Issue
+type byUser []github.Issue
+type byAssignee []github.Issue
+type byComments []github.Issue
+type byClosedAt []github.Issue
+type byCreatedAt []github.Issue
+type byUpdatedAt []github.Issue
+type byMilestone []github.Issue
+
+func (iss byNumber) Len() int {
+	return len(iss)
+}
+func (iss byTitle) Len() int {
+	return len(iss)
+}
+func (iss byBody) Len() int {
+	return len(iss)
+}
+func (iss byUser) Len() int {
+	return len(iss)
+}
+func (iss byAssignee) Len() int {
+	return len(iss)
+}
+func (iss byComments) Len() int {
+	return len(iss)
+}
+func (iss byClosedAt) Len() int {
+	return len(iss)
+}
+func (iss byCreatedAt) Len() int {
+	return len(iss)
+}
+func (iss byUpdatedAt) Len() int {
+	return len(iss)
+}
+func (iss byMilestone) Len() int {
+	return len(iss)
+}
+
+func (iss byNumber) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byTitle) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byBody) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byUser) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byAssignee) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byComments) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byClosedAt) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byCreatedAt) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byUpdatedAt) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+func (iss byMilestone) Swap(i, j int) {
+	temp := iss[i]
+	iss[i] = iss[j]
+	iss[j] = temp
+}
+
+func (iss byNumber) Less(i, j int) bool {
+	return *iss[i].Number < *iss[j].Number
+}
+func (iss byTitle) Less(i, j int) bool {
+	return strings.Compare(*iss[i].Title, *iss[j].Title) < 0
+}
+func (iss byBody) Less(i, j int) bool {
+	return strings.Compare(*iss[i].Body, *iss[j].Body) < 0
+}
+func (iss byUser) Less(i, j int) bool {
+	return strings.Compare(*iss[i].User.Login, *iss[j].User.Login) < 0
+}
+func (iss byAssignee) Less(i, j int) bool {
+	return strings.Compare(*iss[i].Assignee.Login, *iss[j].Assignee.Login) < 0
+}
+func (iss byComments) Less(i, j int) bool {
+	return *iss[i].Comments < *iss[j].Comments
+}
+func (iss byClosedAt) Less(i, j int) bool {
+	return (*iss[i].ClosedAt).Before(*iss[j].ClosedAt)
+}
+func (iss byCreatedAt) Less(i, j int) bool {
+	return (*iss[i].CreatedAt).Before(*iss[j].CreatedAt)
+}
+func (iss byUpdatedAt) Less(i, j int) bool {
+	return (*iss[i].UpdatedAt).Before(*iss[j].UpdatedAt)
+}
+func (iss byMilestone) Less(i, j int) bool {
+	return strings.Compare(*iss[i].Milestone.Title, *iss[j].Milestone.Title) < 0
+}
 
 var tempIssueTitle string
 var tempIssueBody string
@@ -97,18 +222,8 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		browser.Highlight = true
-		for i := 0; i < len(issueList); i++ {
-			if issueState {
-				if *issueList[i].State == "open" {
-					fmt.Fprint(browser, *issueList[i].Number)
-					fmt.Fprintln(browser, ": "+(*issueList[i].Title))
-				}
-			} else {
-				if *issueList[i].State == "closed" {
-					fmt.Fprint(browser, *issueList[i].Number)
-					fmt.Fprintln(browser, ": "+(*issueList[i].Title))
-				}
-			}
+		if err := showIssues(g); err != nil {
+			return err
 		}
 		if err := g.SetCurrentView("browser"); err != nil {
 			return err
@@ -162,7 +277,12 @@ func layout(g *gocui.Gui) error {
 
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
-	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
+	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
+	if err := g.SetKeybinding("browser", gocui.KeyF6, gocui.ModNone, sortIssues); err != nil {
+		return err
+	}
+
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
 			return err
@@ -173,6 +293,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("issueEd", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("sortChoice", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
 		return err
 	}
 	for i := 0; i < len(mainWindows); i++ {
@@ -209,11 +333,11 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], '0', gocui.ModNone, scrollHome); err != nil {
+	for i := 0; i < len(controlWindows); i++ {
+		if err := g.SetKeybinding(controlWindows[i], '0', gocui.ModNone, scrollHome); err != nil {
 			return err
 		}
-		if err := g.SetKeybinding(mainWindows[i], '$', gocui.ModNone, scrollEnd); err != nil {
+		if err := g.SetKeybinding(controlWindows[i], '$', gocui.ModNone, scrollEnd); err != nil {
 			return err
 		}
 	}
@@ -222,8 +346,8 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], 'l', gocui.ModNone, scrollRight); err != nil {
+	for i := 0; i < len(controlWindows); i++ {
+		if err := g.SetKeybinding(controlWindows[i], 'l', gocui.ModNone, scrollRight); err != nil {
 			return err
 		}
 	}
@@ -232,8 +356,8 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], 'h', gocui.ModNone, scrollLeft); err != nil {
+	for i := 0; i < len(controlWindows); i++ {
+		if err := g.SetKeybinding(controlWindows[i], 'h', gocui.ModNone, scrollLeft); err != nil {
 			return err
 		}
 	}
@@ -435,17 +559,9 @@ func setUp() {
 	comments = getComments(len(issueList))
 }
 
-//functions called by keypress below
-
-func refresh(g *gocui.Gui, v *gocui.View) error {
-	issueList = getIssues()
-	comments = getComments(len(issueList))
+func showIssues(g *gocui.Gui) error {
 	browser, err := g.View("browser")
 	if err != nil {
-		return err
-	}
-	current := g.CurrentView()
-	if err := g.SetCurrentView("browser"); err != nil {
 		return err
 	}
 	browser.Clear()
@@ -461,6 +577,61 @@ func refresh(g *gocui.Gui, v *gocui.View) error {
 				fmt.Fprintln(browser, ": "+(*issueList[i].Title))
 			}
 		}
+	}
+	return nil
+}
+
+//functions called by keypress below
+func sortIssues(g *gocui.Gui, v *gocui.View) error {
+	previousView = g.CurrentView()
+	maxX, maxY := g.Size()
+	if sortPrompt, err := g.SetView("sortPrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		sortPrompt.Wrap = true
+		fmt.Fprintln(sortPrompt, "Please select a heading to sort by below")
+	}
+	if sortChoice, err := g.SetView("sortChoice", maxX/4, maxY/3, maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		sortChoice.Highlight = true
+		fmt.Fprintln(sortChoice, "Number")
+		fmt.Fprintln(sortChoice, "Title")
+		fmt.Fprintln(sortChoice, "Body")
+		fmt.Fprintln(sortChoice, "User")
+		fmt.Fprintln(sortChoice, "Assignee")
+		fmt.Fprintln(sortChoice, "Comments")
+		fmt.Fprintln(sortChoice, "Date Closed")
+		fmt.Fprintln(sortChoice, "Date Created")
+		fmt.Fprintln(sortChoice, "Date Updated")
+		fmt.Fprintln(sortChoice, "Milestone Title")
+		if err := g.SetCurrentView("sortChoice"); err != nil {
+			return err
+		}
+	}
+
+	sort.Sort(byUpdatedAt(issueList))
+	if err := showIssues(g); err != nil {
+		return err
+	}
+	return nil
+}
+
+func refresh(g *gocui.Gui, v *gocui.View) error {
+	issueList = getIssues()
+	comments = getComments(len(issueList))
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	current := g.CurrentView()
+	if err := g.SetCurrentView("browser"); err != nil {
+		return err
+	}
+	if err := showIssues(g); err != nil {
+		return err
 	}
 	if err := getLine(g, browser); err != nil {
 		return err
@@ -1002,15 +1173,27 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 }
 
 func cancel(g *gocui.Gui, v *gocui.View) error {
-	if err := g.DeleteView("issueEd"); err != nil {
-		return err
-	}
-	if err := g.DeleteView("issueprompt"); err != nil {
-		return err
-	}
-	entryCount = 0
-	if err := g.SetCurrentView(previousView.Name()); err != nil {
-		return err
+	if (g.CurrentView()).Name() == "issueEd" {
+		if err := g.DeleteView("issueEd"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("issueprompt"); err != nil {
+			return err
+		}
+		entryCount = 0
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+	} else if (g.CurrentView()).Name() == "sortChoice" {
+		if err := g.DeleteView("sortChoice"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("sortPrompt"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
