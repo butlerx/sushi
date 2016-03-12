@@ -391,10 +391,36 @@ func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	return ms, err
 }
 
-func AddMilestone()                                              {}
-func EditMilestone(repo, oldTitle, newTitle string, mileNum int) {}
-func RemoveMilestone()                                           {}
-func DeleteMilestone()                                           {}
+func AddMilestone() {}
+
+func ListMilestones(repo string) ([]github.Milestone, error) {
+	s := strings.Split(repo, "/")
+	milestones, _, err := client.Issues.ListMilestones(s[0], s[1], nil)
+	return milestones, err
+}
+
+func EditMilestone(repo, newTitle string, mileNum int) (github.Milestone, error) {
+	s := strings.Split(repo, "/")
+	temp, _, err := client.Issues.GetMilestone(s[0], s[1], mileNum)
+	if err != nil {
+		milestone := *temp
+		return milestone, err
+	}
+	temp.Title = &newTitle
+	newmilestone, _, err := client.Issues.EditMilestone(s[0], s[1], mileNum, temp)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	milestone := *newmilestone
+	return milestone, err
+}
+
+func RemoveMilestone() {}
+func DeleteMilestone(repo string, mileNum int) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.DeleteMilestone(s[0], s[1], mileNum)
+	return err
+}
 
 func Repos() ([]github.Repository, error) {
 	repos, _, err := client.Repositories.List("", nil)
