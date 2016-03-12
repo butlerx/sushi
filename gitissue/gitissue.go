@@ -249,6 +249,15 @@ func LockIssue(repo string, issueNum int) error {
 	return err
 }
 
+func UnlockIssue(repo string, issueNum int) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.Unlock(s[0], s[1], issueNum)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return err
+}
+
 func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	err = nil
@@ -321,6 +330,12 @@ func DeleteComment(repo string, commentId int) error {
 	return err
 }
 
+func ListLabels(repo string) ([]github.Label, error) {
+	s := strings.Split(repo, "/")
+	labels, _, err := client.Issues.ListLabels(s[0], s[1], nil)
+	return labels, err
+}
+
 func CreateLabel(repo, labelName string) (github.Label, error) {
 	s := strings.Split(repo, "/")
 	label := new(github.Label)
@@ -337,9 +352,35 @@ func AddLabel(repo, labelName string, issueNum int) ([]github.Label, error) {
 	return labels, err
 }
 
-func EditLabel()   {}
-func RemoveLabel() {}
-func DeleteLabel() {}
+func EditLabel(repo, labelName, newName string) (github.Label, error) {
+	s := strings.Split(repo, "/")
+	label := new(github.Label)
+	label.Name = &newName
+	temp, _, err := client.Issues.EditLabel(s[0], s[1], labelName, label)
+	editedLabel := *temp
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return editedLabel, err
+}
+
+func RemoveLabel(repo, labelName string, issueNum int) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.RemoveLabelForIssue(s[0], s[1], issueNum, labelName)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return err
+}
+
+func DeleteLabel(repo, labelName string) error {
+	s := strings.Split(repo, "/")
+	_, err := client.Issues.DeleteLabel(s[0], s[1], labelName)
+	if err == nil {
+		_, err = Issues(repo)
+	}
+	return err
+}
 
 func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	s := strings.Split(repo, "/")
@@ -350,10 +391,10 @@ func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	return ms, err
 }
 
-func AddMilestone()    {}
-func EditMilestone()   {}
-func RemoveMilestone() {}
-func DeleteMilestone() {}
+func AddMilestone()                                              {}
+func EditMilestone(repo, oldTitle, newTitle string, mileNum int) {}
+func RemoveMilestone()                                           {}
+func DeleteMilestone()                                           {}
 
 func Repos() ([]github.Repository, error) {
 	repos, _, err := client.Repositories.List("", nil)
