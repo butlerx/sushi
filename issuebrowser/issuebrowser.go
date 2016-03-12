@@ -772,6 +772,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 	var l string
 	var err error
 	var index int
+	var commentIndex int
 
 	_, cy := v.Cursor()
 	if l, err = v.Line(cy); err != nil {
@@ -831,13 +832,22 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 		}
 
 		//show comments
-		for i := 0; i < (*issueList[index].Comments); i++ {
-			fmt.Fprintln(commentpane, *comments[index][i].User.Login+" commented on "+(*comments[index][i].CreatedAt).Format("Mon Jan 2"))
-			com := *comments[index][i].Body
-			for strings.HasSuffix(com, "\n") {
-				com = com[:len(com)-2]
+		if *issueList[index].Comments > 0 {
+			for ; commentIndex < len(comments); commentIndex++ {
+				if len(comments[commentIndex]) > 0 {
+					if *comments[commentIndex][0].IssueURL == *issueList[index].URL {
+						break
+					}
+				}
 			}
-			fmt.Fprintln(commentpane, "\t\t\t\t"+com+"\n")
+			for i := 0; i < (*issueList[index].Comments); i++ {
+				fmt.Fprintln(commentpane, *comments[commentIndex][i].User.Login+" commented on "+(*comments[commentIndex][i].CreatedAt).Format("Mon Jan 2"))
+				com := *comments[commentIndex][i].Body
+				for strings.HasSuffix(com, "\n") {
+					com = com[:len(com)-2]
+				}
+				fmt.Fprintln(commentpane, "\t\t\t\t"+com+"\n")
+			}
 		}
 
 		//show labes
