@@ -128,6 +128,9 @@ func (iss byUser) Less(i, j int) bool {
 	return strings.Compare(*iss[i].User.Login, *iss[j].User.Login) < 0
 }
 func (iss byAssignee) Less(i, j int) bool {
+	if iss[i].Assignee == nil {
+		return false
+	}
 	return strings.Compare(*iss[i].Assignee.Login, *iss[j].Assignee.Login) < 0
 }
 func (iss byComments) Less(i, j int) bool {
@@ -154,6 +157,8 @@ var entryCount = 0
 var issueState = true
 
 var previousView *gocui.View
+var sortChoice string
+var orderChoice string
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -279,7 +284,7 @@ func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
 	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
-	if err := g.SetKeybinding("browser", gocui.KeyF6, gocui.ModNone, sortIssues); err != nil {
+	if err := g.SetKeybinding("browser", gocui.KeyF6, gocui.ModNone, showSortOrders); err != nil {
 		return err
 	}
 
@@ -293,6 +298,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("issueEd", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("sortChoice", gocui.KeyEnter, gocui.ModNone, getSortOrder); err != nil {
 		return err
 	}
 
@@ -581,8 +590,87 @@ func showIssues(g *gocui.Gui) error {
 	return nil
 }
 
-//functions called by keypress below
 func sortIssues(g *gocui.Gui, v *gocui.View) error {
+	switch {
+	case sortChoice == "Number":
+		if orderChoice == "Ascending" {
+			sort.Sort(byNumber(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byNumber(issueList)))
+		}
+	case sortChoice == "Title":
+		if orderChoice == "Ascending" {
+			sort.Sort(byTitle(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byTitle(issueList)))
+		}
+	case sortChoice == "Body":
+		if orderChoice == "Ascending" {
+			sort.Sort(byBody(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byBody(issueList)))
+		}
+	case sortChoice == "User":
+		if orderChoice == "Ascending" {
+			sort.Sort(byUser(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byUser(issueList)))
+		}
+	case sortChoice == "Assignee":
+		if orderChoice == "Ascending" {
+			sort.Sort(byAssignee(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byAssignee(issueList)))
+		}
+	case sortChoice == "Comments":
+		if orderChoice == "Ascending" {
+			sort.Sort(byComments(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byComments(issueList)))
+		}
+	case sortChoice == "Date Closed":
+		if orderChoice == "Ascending" {
+			sort.Sort(byClosedAt(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byClosedAt(issueList)))
+		}
+	case sortChoice == "Date Created":
+		if orderChoice == "Ascending" {
+			sort.Sort(byCreatedAt(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byCreatedAt(issueList)))
+		}
+	case sortChoice == "Date Updated":
+		if orderChoice == "Ascending" {
+			sort.Sort(byUpdatedAt(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byUpdatedAt(issueList)))
+		}
+	case sortChoice == "Milestone Title":
+		if orderChoice == "Ascending" {
+			sort.Sort(byMilestone(issueList))
+		} else {
+			sort.Sort(sort.Reverse(byMilestone(issueList)))
+		}
+	}
+	if err := showIssues(g); err != nil {
+		return err
+	}
+	if err := cancel(g, v); err != nil {
+		return err
+	}
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	if err := getLine(g, browser); err != nil {
+		return err
+	}
+	return nil
+}
+
+//functions called by keypress below
+func showSortOrders(g *gocui.Gui, v *gocui.View) error {
 	previousView = g.CurrentView()
 	maxX, maxY := g.Size()
 	if sortPrompt, err := g.SetView("sortPrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
@@ -611,10 +699,39 @@ func sortIssues(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 	}
+	return nil
+}
 
-	sort.Sort(byUpdatedAt(issueList))
-	if err := showIssues(g); err != nil {
+func getSortOrder(g *gocui.Gui, v *gocui.View) error {
+	_, cy := v.Cursor()
+	selection, err := v.Line(cy)
+	if err != nil {
 		return err
+	}
+	switch {
+	case selection == "Ascending":
+		orderChoice = selection
+		v.Clear()
+		if err := sortIssues(g, v); err != nil {
+			return err
+		}
+	case selection == "Descending":
+		orderChoice = selection
+		v.Clear()
+		if err := sortIssues(g, v); err != nil {
+			return err
+		}
+	default:
+		sortChoice = selection
+		v.Clear()
+		fmt.Fprintln(v, "Ascending")
+		fmt.Fprintln(v, "Descending")
+		if err := v.SetOrigin(0, 0); err != nil {
+			return err
+		}
+		if err := v.SetCursor(0, 0); err != nil {
+			return err
+		}
 	}
 	return nil
 }
