@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,13 +16,13 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
 	"github.com/robfig/cron"
-	"sort"
 )
 
 var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
 
+//typeCasting Issues so that each has a different sort method, allowing issues to be sorted by any heading
 type byNumber []github.Issue
 type byTitle []github.Issue
 type byBody []github.Issue
@@ -164,16 +165,24 @@ func (iss byMilestone) Less(i, j int) bool {
 	}
 }
 
+//used for recording user input for creating/editing issues
 var tempIssueTitle string
 var tempIssueBody string
 var tempIssueAssignee string
 var tempIssueLabels = make([]string, 0)
-var entryCount = 0
-var issueState = true
+
+var entryCount = 0    //used to record which entry of a dialog the user is on
+var issueState = true //true = open issues, false = closed issues
 
 var previousView *gocui.View
+
+//used to record sorting order
 var sortChoice string
 var orderChoice string
+
+//used to record filter order
+var filterHeading string
+var filterString string
 
 // PassArgs allows the calling program to pass a file path as a string
 func PassArgs(s string) {
@@ -183,10 +192,6 @@ func PassArgs(s string) {
 //Show is the main display function for the issue browser
 func Show() {
 	setUp()
-	timer := cron.New()
-	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
-	timer.AddFunc("0 5 * * * *", func() { comments = getComments(len(issueList)) })
-	timer.Start()
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -200,6 +205,17 @@ func Show() {
 	window.SelBgColor = gocui.ColorWhite
 	window.SelFgColor = gocui.ColorBlack
 	window.Cursor = true
+	timer := cron.New()
+	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
+	timer.AddFunc("0 5 * * * *", func() {
+		browser, err := window.View("browser")
+		if err != nil {
+			log.Panic(err)
+		}
+		sortIssues(window, browser)
+	})
+	timer.AddFunc("0 5 * * * *", func() { comments = getComments(len(issueList)) })
+	timer.Start()
 
 	if err := window.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
@@ -298,9 +314,18 @@ func layout(g *gocui.Gui) error {
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
-	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
-	if err := g.SetKeybinding("browser", gocui.KeyF6, gocui.ModNone, showSortOrders); err != nil {
-		return err
+	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice", "filterChoice"}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF6, gocui.ModNone, showSortOrders); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF4, gocui.ModNone, showFilterHeadings); err != nil {
+			return err
+		}
 	}
 
 	for i := 0; i < len(mainWindows); i++ {
@@ -321,6 +346,14 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("sortChoice", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("filterChoice", gocui.KeyEnter, gocui.ModNone, getFilterHeading); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("filterChoice", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
 		return err
 	}
 	for i := 0; i < len(mainWindows); i++ {
@@ -558,21 +591,24 @@ func unhide() {
 
 //GetLogin sets up the config file if it does not exist
 func GetLogin() {
-	if _, err := os.Stat(".issue/config.json"); os.IsNotExist(err) {
+	isUp, _ := gitissue.IsSetUp()
+	if !isUp {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter GitHub username: ")
 		user, _ := reader.ReadString('\n')
 		if strings.HasSuffix(user, "\n") {
-			user = user[:(len(user) - 2)]
+			user = user[:(len(user) - 1)]
 		}
-		fmt.Print("Enter GitHub Oauth token: ")
+		fmt.Print("Enter GitHub Oauth token. Tokens can be generated at (https://github.com/settings/tokens) :")
 		hide()
 		pass, _ := reader.ReadString('\n')
 		if strings.HasSuffix(pass, "\n") {
-			pass = pass[:(len(pass) - 2)]
+			pass = pass[:(len(pass) - 1)]
 		}
 		unhide()
 		gitissue.SetUp(user, pass)
+	} else {
+		gitissue.SetUp("", "")
 	}
 }
 
@@ -589,6 +625,9 @@ func showIssues(g *gocui.Gui) error {
 		return err
 	}
 	browser.Clear()
+	if len(issueList) == 0 {
+		fmt.Fprintln(browser, "Error reading issues or config file, please ensure your login and Oauth token are correct and that you have a stable internet connection")
+	}
 	for i := 0; i < len(issueList); i++ {
 		if issueState {
 			if *issueList[i].State == "open" {
@@ -667,6 +706,8 @@ func sortIssues(g *gocui.Gui, v *gocui.View) error {
 		} else {
 			sort.Sort(sort.Reverse(byMilestone(issueList)))
 		}
+	case sortChoice == "":
+		sort.Sort(byNumber(issueList))
 	}
 	if err := showIssues(g); err != nil {
 		return err
@@ -685,6 +726,60 @@ func sortIssues(g *gocui.Gui, v *gocui.View) error {
 }
 
 //functions called by keypress below
+func showFilterHeadings(g *gocui.Gui, v *gocui.View) error {
+	previousView = g.CurrentView()
+	maxX, maxY := g.Size()
+	if filterPrompt, err := g.SetView("filterPrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		filterPrompt.Wrap = true
+		fmt.Fprintln(filterPrompt, "Please select a heading to filter by below")
+	}
+	if filterChoice, err := g.SetView("filterChoice", maxX/4, maxY/3, maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		filterChoice.Highlight = true
+		fmt.Fprintln(filterChoice, "Number")
+		fmt.Fprintln(filterChoice, "Title")
+		fmt.Fprintln(filterChoice, "Body")
+		fmt.Fprintln(filterChoice, "User")
+		fmt.Fprintln(filterChoice, "Assignee")
+		fmt.Fprintln(filterChoice, "Comments")
+		fmt.Fprintln(filterChoice, "Date Closed")
+		fmt.Fprintln(filterChoice, "Date Created")
+		fmt.Fprintln(filterChoice, "Date Updated")
+		fmt.Fprintln(filterChoice, "Milestone Title")
+		if err := g.SetCurrentView("filterChoice"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getFilterHeading(g *gocui.Gui, v *gocui.View) error {
+	_, cy := v.Cursor()
+	selection, err := v.Line(cy)
+	if err != nil {
+		return err
+	}
+	if filterHeading == "" {
+		filterHeading = selection
+		v.Clear()
+		if err := v.SetOrigin(0, 0); err != nil {
+			return err
+		}
+		if err := v.SetCursor(0, 0); err != nil {
+			return err
+		}
+		v.Editable = true
+	} else {
+		filterString = selection
+	}
+	return nil
+}
+
 func showSortOrders(g *gocui.Gui, v *gocui.View) error {
 	previousView = g.CurrentView()
 	maxX, maxY := g.Size()
@@ -1324,6 +1419,13 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+	} else if (g.CurrentView()).Name() == "filterChoice" {
+		if err := g.DeleteView("filterChoice"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("filterPrompt"); err != nil {
 			return err
 		}
 	}
