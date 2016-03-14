@@ -116,7 +116,7 @@ func SetUp(user, oauth string) error {
 }
 
 func logSetUp() *log.Logger {
-	logFile, err := os.OpenFile("sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(path+"sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
 	}
@@ -147,7 +147,7 @@ func Login() error {
 		GitLog.Printf("\nerror: %v\n", err)
 		return err
 	}
-	GitLog.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
+	log.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
 	return nil
 }
 
