@@ -60,7 +60,7 @@ func IsSetUp() (bool, error) {
 }
 
 func SetUp(user, oauth string) error {
-	_ = logSetUp()
+	GitLog = logSetUp()
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
 		return err
