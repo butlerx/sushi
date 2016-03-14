@@ -5,6 +5,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -59,13 +60,28 @@ func IsSetUp() (bool, error) {
 	return true, nil
 }
 
-func SetUp(user, oauth string) error {
-	GitLog = logSetUp()
+func checkgit() bool {
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
+		if path == "/" {
+			return false
+		} else {
+			s := strings.Split(path, "/")
+			path = "/"
+			for i := 1; i < len(s)-1; i++ {
+				path = s[i] + "/"
+			}
+			checkgit()
+		}
+	}
+	return true
+}
+func SetUp(user, oauth string) error {
+	GitLog = logSetUp()
+	if checkgit() == false {
+		err := errors.New("Not git repo")
 		return err
 	}
-	_, err = os.Stat(path + ".issue")
 	if os.IsNotExist(err) {
 		err := os.Mkdir(path+".issue", 0755)
 		if err != nil {
