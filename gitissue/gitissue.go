@@ -27,6 +27,7 @@ var (
 	conf            *Config
 	folderpath, err = filepath.Abs(".")
 	path            = folderpath + "/"
+	GitLog          *log.Logger
 )
 
 func write(toWrite []github.Issue, file string) error {
@@ -59,6 +60,7 @@ func IsSetUp() (bool, error) {
 }
 
 func SetUp(user, oauth string) error {
+	_ = logSetUp()
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
 		return err
@@ -67,7 +69,7 @@ func SetUp(user, oauth string) error {
 	if os.IsNotExist(err) {
 		err := os.Mkdir(path+".issue", 0755)
 		if err != nil {
-			log.Println("make folder: ", err)
+			GitLog.Println("make folder: ", err)
 			return err
 		}
 	}
@@ -113,15 +115,24 @@ func SetUp(user, oauth string) error {
 	return err
 }
 
+func logSetUp() *log.Logger {
+	logFile, err := os.OpenFile("sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalln("Failed to open logfile: ", err)
+	}
+	GitLog := log.New(logFile, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	return GitLog
+}
+
 func Login() error {
 	file, err := ioutil.ReadFile(path + ".issue/config.json")
 	if err != nil {
-		log.Println("open config: ", err)
+		GitLog.Println("open config: ", err)
 		os.Exit(1)
 	}
 	temp := new(Config)
 	if err = json.Unmarshal(file, temp); err != nil {
-		log.Println("parse config: ", err)
+		GitLog.Println("parse config: ", err)
 		os.Exit(1)
 	}
 	conf = temp
@@ -133,10 +144,10 @@ func Login() error {
 	user, _, err := client.Users.Get("")
 
 	if err != nil {
-		log.Printf("\nerror: %v\n", err)
+		GitLog.Printf("\nerror: %v\n", err)
 		return err
 	}
-	log.Printf("\nLogged into: %v\n", github.Stringify(user))
+	GitLog.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
 	return nil
 }
 
@@ -177,12 +188,12 @@ func Issues(repo string) ([]github.Issue, error) {
 	}
 	file, err := ioutil.ReadFile(path + ".issue/issues.json")
 	if err != nil {
-		log.Println("open issues: ", err)
+		GitLog.Println("open issues: ", err)
 		os.Exit(1)
 	}
 	temp := new([]github.Issue)
 	if err = json.Unmarshal(file, temp); err != nil {
-		log.Println("parse issues: ", err)
+		GitLog.Println("parse issues: ", err)
 		os.Exit(1)
 	}
 	issues = *temp
@@ -303,12 +314,12 @@ func readComments() ([]Comments, error) {
 	file := path + ".issue/comments.json"
 	read, err := ioutil.ReadFile(file)
 	if err != nil {
-		log.Println("open comments: ", err)
+		GitLog.Println("open comments: ", err)
 		os.Exit(1)
 	}
 	temp := new([]Comments)
 	if err = json.Unmarshal(read, temp); err != nil {
-		log.Println("parse comments: ", err)
+		GitLog.Println("parse comments: ", err)
 		os.Exit(1)
 	}
 	comments := *temp
@@ -437,7 +448,7 @@ func Repos() ([]github.Repository, error) {
 }
 
 func OrgsList() ([]github.Organization, error) {
-	log.Println(conf.Username)
+	GitLog.Println(conf.Username)
 	orgs, _, err := client.Organizations.List(conf.Username, nil)
 	return orgs, err
 }
