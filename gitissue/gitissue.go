@@ -41,6 +41,10 @@ func write(toWrite []github.Issue, file string) error {
 }
 
 func IsSetUp() (bool, error) {
+	if checkgit() == false {
+		err := errors.New("Not git repo")
+		return false, err
+	}
 	_, err = os.Stat(path + ".issue")
 	if os.IsNotExist(err) {
 		return false, err
@@ -78,10 +82,6 @@ func checkgit() bool {
 }
 func SetUp(user, oauth string) error {
 	GitLog = logSetUp()
-	if checkgit() == false {
-		err := errors.New("Not git repo")
-		return err
-	}
 	if os.IsNotExist(err) {
 		err := os.Mkdir(path+".issue", 0755)
 		if err != nil {
@@ -132,7 +132,7 @@ func SetUp(user, oauth string) error {
 }
 
 func logSetUp() *log.Logger {
-	logFile, err := os.OpenFile(path+"sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
 	}
