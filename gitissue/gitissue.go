@@ -101,7 +101,16 @@ func SetUp(user, oauth string) error {
 			return err
 		}
 	}
-	return nil
+	_, err = ioutil.ReadFile(path + ".gitignore")
+	if err == nil {
+		f, _ := os.OpenFile(".gitignore", os.O_APPEND, 0446)
+		_, _ = f.WriteString(".issue/config.json")
+		f.Close()
+	} else {
+		ignore := []byte(".issue/config.json")
+		err = ioutil.WriteFile(".gitignore", ignore, 0644)
+	}
+	return err
 }
 
 func Login() error {
