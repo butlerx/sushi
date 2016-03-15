@@ -315,8 +315,8 @@ func layout(g *gocui.Gui) error {
 
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
-	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice", "filterChoice"}
-	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice", "filterChoice"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "sortChoice", "filterChoice"}
+	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "sortChoice", "filterChoice"}
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF1, gocui.ModNone, help); err != nil {
@@ -355,6 +355,16 @@ func keybindings(g *gocui.Gui) error {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
 			return err
 		}
+	}
+
+	if err := g.SetKeybinding("helpPane", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("helpPane", gocui.KeyF1, gocui.ModNone, cancel); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("helpPane", '?', gocui.ModNone, cancel); err != nil {
+		return err
 	}
 	if err := g.SetKeybinding("issueEd", gocui.KeyEnter, gocui.ModNone, nextEntry); err != nil {
 		return err
@@ -426,7 +436,7 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	for i := 0; i < len(controlWindows); i++ {
+	for i := 0; i < len(controlWindows)-1; i++ {
 		if err := g.SetKeybinding(controlWindows[i], 'l', gocui.ModNone, scrollRight); err != nil {
 			return err
 		}
@@ -436,7 +446,7 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
-	for i := 0; i < len(controlWindows); i++ {
+	for i := 0; i < len(controlWindows)-1; i++ {
 		if err := g.SetKeybinding(controlWindows[i], 'h', gocui.ModNone, scrollLeft); err != nil {
 			return err
 		}
@@ -865,7 +875,7 @@ func help(g *gocui.Gui, v *gocui.View) error {
 		}
 		fmt.Fprintln(helpPane, "F1, '?' = Help")
 		fmt.Fprintln(helpPane, "F2, 'm' = Toggle open/closed")
-		fmt.Fprintln(helpPane, "F4 			= Filter")
+		fmt.Fprintln(helpPane, "F4 = Filter")
 		fmt.Fprintln(helpPane, "F6, 's' = Sort by heading")
 		fmt.Fprintln(helpPane, "")
 		fmt.Fprintln(helpPane, "▼ , 'j' = Down")
@@ -879,11 +889,14 @@ func help(g *gocui.Gui, v *gocui.View) error {
 		fmt.Fprintln(helpPane, "PgDn = Page Down")
 		fmt.Fprintln(helpPane, "'gg' = Window Top")
 		fmt.Fprintln(helpPane, "'G' = Window Bottom")
-		fmt.Fprintln(helpPane, "'gt' = Window Top")
 		fmt.Fprintln(helpPane, "")
 		fmt.Fprintln(helpPane, "Ctrl + W = Enter window changing mode, nav keys to pick a window")
 		fmt.Fprintln(helpPane, "'gt' = Next window")
 		fmt.Fprintln(helpPane, "'gT' = Previous window")
+		fmt.Fprintln(helpPane, "Ctrl + C = Cancel out of dialog box")
+		if err := g.SetCurrentView("helpPane"); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1649,6 +1662,13 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		if err := g.DeleteView("filterPrompt"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+	} else if (g.CurrentView()).Name() == "helpPane" {
+		if err := g.DeleteView("helpPane"); err != nil {
 			return err
 		}
 		if err := g.SetCurrentView(previousView.Name()); err != nil {
