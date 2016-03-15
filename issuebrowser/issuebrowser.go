@@ -191,7 +191,9 @@ func PassArgs(s string) {
 
 //Show is the main display function for the issue browser
 func Show() {
-	setUp()
+	if err := setUp(); err != nil {
+		log.Panic(err)
+	}
 	window := gocui.NewGui()
 	if err := window.Init(); err != nil {
 		log.Panicln(err)
@@ -302,31 +304,52 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
-	if helppane, err := g.SetView("helppane", -1, maxY-2, maxX, maxY); err != nil {
+	if infobar, err := g.SetView("infobar", -1, maxY-2, maxX, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(helppane, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"q = Quit, "+"\t"+"Ctrl+R = Refresh")
+		fmt.Fprintln(infobar, "▲ ▼ ◀ ▶ = navigate, "+"\t"+"q = Quit, "+"\t"+"Ctrl+R = Refresh")
 	}
 	return nil
 }
 
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
-	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice", "filterChoice"}
 	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "sortChoice", "filterChoice"}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF1, gocui.ModNone, help); err != nil {
+			return err
+		}
+		if err := g.SetKeybinding(mainWindows[i], '?', gocui.ModNone, help); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF2, gocui.ModNone, toggleState); err != nil {
+			return err
+		}
+		if err := g.SetKeybinding(mainWindows[i], 'm', gocui.ModNone, toggleState); err != nil {
+			return err
+		}
+	}
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF6, gocui.ModNone, showSortOrders); err != nil {
 			return err
 		}
-	}
-
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF4, gocui.ModNone, showFilterHeadings); err != nil {
+		if err := g.SetKeybinding(mainWindows[i], 's', gocui.ModNone, showSortOrders); err != nil {
 			return err
 		}
 	}
+
+	/*for i := 0; i < len(mainWindows); i++ {
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF4, gocui.ModNone, showFilterHeadings); err != nil {
+			return err
+		}
+	}*/
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
@@ -441,7 +464,7 @@ func keybindings(g *gocui.Gui) error {
 		}
 	}
 
-	for i := 0; i < len(displayWindows); i++ {
+	for i := 0; i < (len(displayWindows) - 1); i++ {
 		if err := g.SetKeybinding(displayWindows[i], 'j', gocui.ModNone, cursordown); err != nil {
 			return err
 		}
@@ -453,7 +476,7 @@ func keybindings(g *gocui.Gui) error {
 		}
 	}
 
-	for i := 0; i < len(displayWindows); i++ {
+	for i := 0; i < (len(displayWindows) - 1); i++ {
 		if err := g.SetKeybinding(displayWindows[i], 'k', gocui.ModNone, cursorup); err != nil {
 			return err
 		}
@@ -515,7 +538,7 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("windowTabber", 'g', gocui.ModNone, scrollTop); err != nil {
 		return err
 	}
-	for i := 0; i < len(displayWindows); i++ {
+	for i := 0; i < (len(displayWindows) - 1); i++ {
 		if err := g.SetKeybinding(displayWindows[i], 'G', gocui.ModNone, scrollBottom); err != nil {
 			return err
 		}
@@ -590,7 +613,7 @@ func unhide() {
 }
 
 //GetLogin sets up the config file if it does not exist
-func GetLogin() {
+func GetLogin() error {
 	isUp, _ := gitissue.IsSetUp()
 	if !isUp {
 		reader := bufio.NewReader(os.Stdin)
@@ -606,17 +629,32 @@ func GetLogin() {
 			pass = pass[:(len(pass) - 1)]
 		}
 		unhide()
-		gitissue.SetUp(user, pass)
+		if err := gitissue.SetUp(user, pass); err != nil {
+			return err
+		}
 	} else {
-		gitissue.SetUp("", "")
+		if err := gitissue.SetUp("", ""); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func setUp() {
-	GetLogin()
-	gitissue.Login()
+func setUp() error {
+	if err := GetLogin(); err != nil {
+		return err
+	}
+	if err := gitissue.Login(); err != nil {
+		return err
+	}
 	issueList = getIssues()
 	comments = getComments(len(issueList))
+	return nil
+}
+
+func printIssues(g *gocui.Gui, v *gocui.View, i int) {
+	fmt.Fprint(v, *issueList[i].Number)
+	fmt.Fprintln(v, ": "+(*issueList[i].Title))
 }
 
 func showIssues(g *gocui.Gui) error {
@@ -631,13 +669,105 @@ func showIssues(g *gocui.Gui) error {
 	for i := 0; i < len(issueList); i++ {
 		if issueState {
 			if *issueList[i].State == "open" {
-				fmt.Fprint(browser, *issueList[i].Number)
-				fmt.Fprintln(browser, ": "+(*issueList[i].Title))
+				switch {
+				case filterHeading == "Number":
+					if strings.Contains(strconv.Itoa(*issueList[i].Number), filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Title":
+					if strings.Contains(*issueList[i].Title, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Body":
+					if strings.Contains(*issueList[i].Body, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "User":
+					if strings.Contains(*issueList[i].User.Login, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Assignee":
+					if strings.Contains(*issueList[i].Assignee.Login, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Comments":
+					commentIndex := 0
+					contains := false
+					if *issueList[i].Comments > 0 {
+						for ; commentIndex < len(comments); commentIndex++ {
+							if len(comments[commentIndex]) > 0 {
+								if *comments[commentIndex][0].IssueURL == *issueList[i].URL {
+									break
+								}
+							}
+						}
+						for i := 0; i < len(comments[commentIndex]); i++ {
+							if strings.Contains(*comments[commentIndex][i].Body, filterString) {
+								contains = true
+							}
+						}
+						if contains {
+							printIssues(g, browser, i)
+						}
+					}
+				case filterHeading == "Milestone Title":
+					if strings.Contains(*issueList[i].Milestone.Title, filterString) {
+						printIssues(g, browser, i)
+					}
+				default:
+					printIssues(g, browser, i)
+				}
 			}
 		} else {
 			if *issueList[i].State == "closed" {
-				fmt.Fprint(browser, *issueList[i].Number)
-				fmt.Fprintln(browser, ": "+(*issueList[i].Title))
+				switch {
+				case filterHeading == "Number":
+					if strings.Contains(strconv.Itoa(*issueList[i].Number), filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Title":
+					if strings.Contains(*issueList[i].Title, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Body":
+					if strings.Contains(*issueList[i].Body, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "User":
+					if strings.Contains(*issueList[i].User.Login, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Assignee":
+					if strings.Contains(*issueList[i].Assignee.Login, filterString) {
+						printIssues(g, browser, i)
+					}
+				case filterHeading == "Comments":
+					commentIndex := 0
+					contains := false
+					if *issueList[i].Comments > 0 {
+						for ; commentIndex < len(comments); commentIndex++ {
+							if len(comments[commentIndex]) > 0 {
+								if *comments[commentIndex][0].IssueURL == *issueList[i].URL {
+									break
+								}
+							}
+						}
+						for i := 0; i < len(comments[commentIndex]); i++ {
+							if strings.Contains(*comments[commentIndex][i].Body, filterString) {
+								contains = true
+							}
+						}
+						if contains {
+							printIssues(g, browser, i)
+						}
+					}
+				case filterHeading == "Milestone Title":
+					if strings.Contains(*issueList[i].Milestone.Title, filterString) {
+						printIssues(g, browser, i)
+					}
+				default:
+					printIssues(g, browser, i)
+				}
 			}
 		}
 	}
@@ -726,6 +856,38 @@ func sortIssues(g *gocui.Gui, v *gocui.View) error {
 }
 
 //functions called by keypress below
+func help(g *gocui.Gui, v *gocui.View) error {
+	previousView = g.CurrentView()
+	maxX, maxY := g.Size()
+	if helpPane, err := g.SetView("helpPane", maxX/4, maxY/6, maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(helpPane, "F1, '?' = Help")
+		fmt.Fprintln(helpPane, "F2, 'm' = Toggle open/closed")
+		fmt.Fprintln(helpPane, "F4 			= Filter")
+		fmt.Fprintln(helpPane, "F6, 's' = Sort by heading")
+		fmt.Fprintln(helpPane, "")
+		fmt.Fprintln(helpPane, "▼ , 'j' = Down")
+		fmt.Fprintln(helpPane, "▲ , 'k' = Up")
+		fmt.Fprintln(helpPane, "◀ , 'h' = Left")
+		fmt.Fprintln(helpPane, "▶ , 'l'	= Right")
+		fmt.Fprintln(helpPane, "")
+		fmt.Fprintln(helpPane, "Home, '0'	= Home")
+		fmt.Fprintln(helpPane, "End, '$' = End")
+		fmt.Fprintln(helpPane, "PgUp = Page Up")
+		fmt.Fprintln(helpPane, "PgDn = Page Down")
+		fmt.Fprintln(helpPane, "'gg' = Window Top")
+		fmt.Fprintln(helpPane, "'G' = Window Bottom")
+		fmt.Fprintln(helpPane, "'gt' = Window Top")
+		fmt.Fprintln(helpPane, "")
+		fmt.Fprintln(helpPane, "Ctrl + W = Enter window changing mode, nav keys to pick a window")
+		fmt.Fprintln(helpPane, "'gt' = Next window")
+		fmt.Fprintln(helpPane, "'gT' = Previous window")
+	}
+	return nil
+}
+
 func showFilterHeadings(g *gocui.Gui, v *gocui.View) error {
 	previousView = g.CurrentView()
 	maxX, maxY := g.Size()
@@ -735,21 +897,21 @@ func showFilterHeadings(g *gocui.Gui, v *gocui.View) error {
 		}
 		filterPrompt.Wrap = true
 		fmt.Fprintln(filterPrompt, "Please select a heading to filter by below")
+		fmt.Fprintln(filterPrompt, "")
+		fmt.Fprintln(filterPrompt, "Ctrl + C to cancel")
 	}
 	if filterChoice, err := g.SetView("filterChoice", maxX/4, maxY/3, maxX-(maxX/4), maxY-(maxY/3)); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		filterChoice.Highlight = true
+		fmt.Fprintln(filterChoice, "Clear Filter")
 		fmt.Fprintln(filterChoice, "Number")
 		fmt.Fprintln(filterChoice, "Title")
 		fmt.Fprintln(filterChoice, "Body")
 		fmt.Fprintln(filterChoice, "User")
 		fmt.Fprintln(filterChoice, "Assignee")
 		fmt.Fprintln(filterChoice, "Comments")
-		fmt.Fprintln(filterChoice, "Date Closed")
-		fmt.Fprintln(filterChoice, "Date Created")
-		fmt.Fprintln(filterChoice, "Date Updated")
 		fmt.Fprintln(filterChoice, "Milestone Title")
 		if err := g.SetCurrentView("filterChoice"); err != nil {
 			return err
@@ -759,23 +921,46 @@ func showFilterHeadings(g *gocui.Gui, v *gocui.View) error {
 }
 
 func getFilterHeading(g *gocui.Gui, v *gocui.View) error {
-	_, cy := v.Cursor()
-	selection, err := v.Line(cy)
+	filterChoice, err := g.View("filterChoice")
 	if err != nil {
 		return err
 	}
-	if filterHeading == "" {
+	_, cy := filterChoice.Cursor()
+	selection, err := filterChoice.Line(cy)
+	if err != nil {
+		return err
+	}
+	if selection == "Clear Filter" {
+		filterHeading = ""
+		filterString = ""
+		if err := cancel(g, v); err != nil {
+			return err
+		}
+	} else if filterHeading == "" {
 		filterHeading = selection
-		v.Clear()
-		if err := v.SetOrigin(0, 0); err != nil {
+		if strings.HasSuffix(filterHeading, "\n") {
+			filterHeading = filterHeading[:len(filterHeading)-1]
+		}
+		filterChoice.Clear()
+		if err := filterChoice.SetOrigin(0, 0); err != nil {
 			return err
 		}
-		if err := v.SetCursor(0, 0); err != nil {
+		if err := filterChoice.SetCursor(0, 0); err != nil {
 			return err
 		}
-		v.Editable = true
+		filterChoice.Editable = true
 	} else {
 		filterString = selection
+		if strings.HasSuffix(filterString, "\n") {
+			filterString = filterString[:len(filterString)-1]
+		}
+		filterString = strings.Trim(filterString, " ")
+		if err := cancel(g, v); err != nil {
+			return err
+		}
+	}
+	if err := showIssues(g); err != nil {
+		return err
 	}
 	return nil
 }
@@ -789,6 +974,8 @@ func showSortOrders(g *gocui.Gui, v *gocui.View) error {
 		}
 		sortPrompt.Wrap = true
 		fmt.Fprintln(sortPrompt, "Please select a heading to sort by below")
+		fmt.Fprintln(sortPrompt, "")
+		fmt.Fprintln(sortPrompt, "Ctrl + C to cancel")
 	}
 	if sortChoice, err := g.SetView("sortChoice", maxX/4, maxY/3, maxX-(maxX/4), maxY-(maxY/3)); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -1242,7 +1429,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 				fmt.Fprintln(commentpane, *comments[commentIndex][i].User.Login+" commented on "+(*comments[commentIndex][i].CreatedAt).Format("Mon Jan 2"))
 				com := *comments[commentIndex][i].Body
 				for strings.HasSuffix(com, "\n") {
-					com = com[:len(com)-2]
+					com = com[:len(com)-1]
 				}
 				fmt.Fprintln(commentpane, "\t\t\t\t"+com+"\n")
 			}
@@ -1294,6 +1481,40 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func toggleState(g *gocui.Gui, v *gocui.View) error {
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	_, cy := browser.Cursor()
+	current, err := browser.Line(cy)
+	if err != nil {
+		return err
+	}
+	line := strings.Split(current, ":")
+	for i := 0; i < len(issueList); i++ {
+		if line[0] == strconv.Itoa(*issueList[i].Number) {
+			if *issueList[i].State == "open" {
+				temp, err := gitissue.OpenIssue(getRepo(), issueList[i])
+				if err != nil {
+					return err
+				}
+				issueList[i] = *temp
+				break
+			} else {
+				temp, err := gitissue.CloseIssue(getRepo(), issueList[i])
+				if err != nil {
+					return err
+				}
+				issueList[i] = *temp
+				break
+			}
+
+		}
+	}
+	return nil
+}
+
 func newIssue(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	maxX, maxY := g.Size()
@@ -1315,6 +1536,7 @@ func newIssue(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//nextEntry is used to cycle through each option in the newIssue creation process
 func nextEntry(g *gocui.Gui, v *gocui.View) error {
 	issueEd, err := g.View("issueEd")
 	if err != nil {
@@ -1399,6 +1621,7 @@ func nextEntry(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//cancel is used to close dialog boxes
 func cancel(g *gocui.Gui, v *gocui.View) error {
 	if (g.CurrentView()).Name() == "issueEd" {
 		if err := g.DeleteView("issueEd"); err != nil {
@@ -1426,6 +1649,9 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		if err := g.DeleteView("filterPrompt"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
 			return err
 		}
 	}
