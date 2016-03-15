@@ -325,22 +325,19 @@ func keybindings(g *gocui.Gui) error {
 		if err := g.SetKeybinding(mainWindows[i], '?', gocui.ModNone, help); err != nil {
 			return err
 		}
-	}
-
-	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF2, gocui.ModNone, toggleState); err != nil {
 			return err
 		}
 		if err := g.SetKeybinding(mainWindows[i], 'm', gocui.ModNone, toggleState); err != nil {
 			return err
 		}
-	}
-
-	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF6, gocui.ModNone, showSortOrders); err != nil {
 			return err
 		}
 		if err := g.SetKeybinding(mainWindows[i], 's', gocui.ModNone, showSortOrders); err != nil {
+			return err
+		}
+		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
 			return err
 		}
 	}
@@ -350,12 +347,6 @@ func keybindings(g *gocui.Gui) error {
 			return err
 		}
 	}*/
-
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlW, gocui.ModNone, changeWindow); err != nil {
-			return err
-		}
-	}
 
 	if err := g.SetKeybinding("helpPane", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
 		return err
@@ -389,10 +380,17 @@ func keybindings(g *gocui.Gui) error {
 	if err := g.SetKeybinding("filterChoice", gocui.KeyCtrlC, gocui.ModNone, cancel); err != nil {
 		return err
 	}
-	for i := 0; i < len(mainWindows); i++ {
-		if err := g.SetKeybinding(mainWindows[i], gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
-			return err
-		}
+
+	if err := g.SetKeybinding("browser", gocui.KeyCtrlN, gocui.ModNone, newIssue); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", gocui.KeyCtrlN, gocui.ModNone, newComment); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentBody", gocui.KeyEnter, gocui.ModNone, writeComment); err != nil {
+		return err
 	}
 
 	if err := g.SetKeybinding("browser", gocui.KeyPgup, gocui.ModNone, scrollupget); err != nil {
@@ -1509,7 +1507,7 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 	line := strings.Split(current, ":")
 	for i := 0; i < len(issueList); i++ {
 		if line[0] == strconv.Itoa(*issueList[i].Number) {
-			if *issueList[i].State == "open" {
+			if *issueList[i].State != "open" {
 				temp, err := gitissue.OpenIssue(getRepo(), issueList[i])
 				if err != nil {
 					return err
@@ -1526,6 +1524,68 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 			}
 
 		}
+	}
+	return nil
+}
+
+func newComment(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	maxX, maxY := g.Size()
+	if commentPrompt, err := g.SetView("commentPrompt", maxX/4, maxY/3, maxX-(maxX/4), (maxY/3)+(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(commentPrompt, "Please enter you comment text.\nPress enter to write out")
+	}
+	if commentBody, err := g.SetView("commentBody", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		commentBody.Editable = true
+	}
+	if err := g.SetCurrentView("commentBody"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeComment(g *gocui.Gui, v *gocui.View) error {
+	comment := v.Buffer()
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	_, cy := browser.Cursor()
+	line, err := browser.Line(cy)
+	if err != nil {
+		return err
+	}
+	issueNum := strings.Split(line, ":")
+	issueIndex := 0
+	for ; issueIndex < len(issueList); issueIndex++ {
+		if issueNum[0] == strconv.Itoa(*issueList[issueIndex].Number) {
+			break
+		}
+	}
+	commentIndex := 0
+	for ; commentIndex < len(comments); commentIndex++ {
+		if len(comments[commentIndex]) > 0 {
+			if *comments[commentIndex][0].IssueURL == *issueList[issueIndex].URL {
+				break
+			}
+		}
+	}
+	num, err := strconv.Atoi(issueNum[0])
+	if err != nil {
+		return err
+	}
+	tempComment, err := gitissue.Comment(getRepo(), comment, num)
+	if err != nil {
+		return err
+	}
+	comments[commentIndex] = append(comments[commentIndex], tempComment)
+	if err := cancel(g, v); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1664,6 +1724,16 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		if err := g.DeleteView("filterPrompt"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+	} else if (g.CurrentView()).Name() == "commentBody" {
+		if err := g.DeleteView("commentBody"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("commentPrompt"); err != nil {
 			return err
 		}
 		if err := g.SetCurrentView(previousView.Name()); err != nil {
