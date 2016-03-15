@@ -560,7 +560,7 @@ func keybindings(g *gocui.Gui) error {
 
 //helper functions
 func getRepo() string {
-	dat, err := ioutil.ReadFile(".git/config")
+	dat, err := ioutil.ReadFile(*gitissue.Path + ".git/config")
 	if err != nil {
 		panic(err)
 	}
@@ -1537,7 +1537,7 @@ func newComment(g *gocui.Gui, v *gocui.View) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		fmt.Fprintln(commentPrompt, "Please enter you comment text.\nPress enter to write out")
+		fmt.Fprintln(commentPrompt, "Please enter you comment text.\nPress enter to write out.\n\nPress Ctrl+C to cancel")
 	}
 	if commentBody, err := g.SetView("commentBody", maxX/4, (maxY/3)+(maxY/6), maxX-(maxX/4), maxY-(maxY/3)); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -1577,6 +1577,9 @@ func writeComment(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
+	if len(comments) > 0 {
+		log.Println(len(comments))
+	}
 	num, err := strconv.Atoi(issueNum[0])
 	if err != nil {
 		return err
@@ -1588,6 +1591,9 @@ func writeComment(g *gocui.Gui, v *gocui.View) error {
 	comments[commentIndex] = append(comments[commentIndex], tempComment)
 	if err := cancel(g, v); err != nil {
 		return err
+	}
+	if len(comments) > 0 {
+		log.Println(len(comments))
 	}
 	return nil
 }
