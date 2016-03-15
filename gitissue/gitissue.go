@@ -36,8 +36,8 @@ var (
 	GitLog          *log.Logger
 )
 
-// Write issues out to file
-func write(toWrite []github.Issue, file string) error {
+// Write issues out to file.
+func writeIssue(toWrite []github.Issue, file string) error {
 	file = path + ".issue/" + file + ".json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {
@@ -46,7 +46,7 @@ func write(toWrite []github.Issue, file string) error {
 	return err
 }
 
-// Check if users config is set up and if being run in git repo
+// Check if users config is set up and if being run in git repo.
 func IsSetUp() (bool, error) {
 	if checkgit() == false {
 		err := errors.New("Not git repo")
@@ -71,7 +71,8 @@ func IsSetUp() (bool, error) {
 	return true, nil
 }
 
-// Check if being run in a git repo or a child in a git repo
+// Check if being run in a git repo or a child in a git repo.
+// TODO currently doesnt work
 func checkgit() bool {
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
@@ -89,9 +90,9 @@ func checkgit() bool {
 	return true
 }
 
-// Set up .issue folder, issues, comments & config file and begin logfile
-// appends to to gitignore to ignore the config file
-// Checks if the files exist and if they dont creates them
+// Set up .issue folder, issues, comments & config file and begin logfile.
+// Appends to to gitignore to ignore the config file.
+// Checks if the files exist and if they dont creates them.
 func SetUp(user, oauth string) error {
 	GitLog = logSetUp()
 	_, err = os.Stat(path + ".issue")
@@ -145,8 +146,8 @@ func SetUp(user, oauth string) error {
 	return nil
 }
 
-// Sets up Log file and creates logger object
-// returns GitLog to be used to log erros
+// Sets up Log file and creates logger object.
+// Returns GitLog to be used to log erros.
 func logSetUp() *log.Logger {
 	_, err = ioutil.ReadFile(path + ".issue/sushi.log")
 	logFile := new(os.File)
@@ -162,8 +163,8 @@ func logSetUp() *log.Logger {
 	return GitLog
 }
 
-// Logs in to github using oauth
-// returns error if login fails
+// Logs in to github using oauth.
+// Returns error if login fails.
 func Login() error {
 	file, err := ioutil.ReadFile(path + ".issue/config.json")
 	if err != nil {
@@ -192,10 +193,10 @@ func Login() error {
 	return nil
 }
 
-// filters issues based on mileston, assignee, creatoror, labels or state
-// pass empty strings for things that arnt to be filtered
-// returns array of issues in order asked for
-// TODO(butlerx) filter offline issues if query of repo fails
+// Filters issues based on mileston, assignee, creatoror, labels or state.
+// Pass empty strings for things that arnt to be filtered.
+// Returns array of issues in order asked for.
+// TODO(butlerx) filter offline issues if query of repo fails.
 func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string, labels []string) ([]github.Issue, error) {
 	s := strings.Split(repo, "/")
 	sorting := new(github.IssueListByRepoOptions)
@@ -224,16 +225,16 @@ func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string,
 	return issues, err
 }
 
-// Pull all issues and write them to .issue/issues.json
-// Pulls both open and closed issues
-// Used to update issues.json
-// method for accessing issue.json
-// Returns last pull if cant connect to server
-// repo should be structured as "user/repo"
+// Pull all issues and write them to .issue/issues.json.
+// Pulls both open and closed issues.
+// Used to update issues.json.
+// Method for accessing issue.json.
+// Returns last pull if cant connect to server.
+// Repo should be structured as "user/repo"
 func Issues(repo string) ([]github.Issue, error) {
 	issues, err := IssuesFilter(repo, "all", "", "", "", "", "", nil)
 	if err == nil {
-		write(issues, "issues")
+		writeIssue(issues, "issues")
 		return issues, err
 	}
 	file, err := ioutil.ReadFile(path + ".issue/issues.json")
@@ -251,10 +252,11 @@ func Issues(repo string) ([]github.Issue, error) {
 }
 
 // Create an issue on github.
-// requires repo and title args,
+// Requires repo and title args,
 // rest are optinal arg and can be passed empty.
+// Make issue put milestone at 0 for no milestone.
 // BUG(butlerx) doesnt work in offile mode.
-func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
+func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) {
 	s := strings.Split(repo, "/")
 	newIssue := new(github.Issue)
 	state := "open"
@@ -302,13 +304,13 @@ func EditIssue(repo string, oldIssue *github.Issue) (*github.Issue, error) {
 	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
 	if err == nil {
 		_, err = Issues(repo)
-	} //else {
-	GitLog.Println("Edit issue: ", err)
-	//}
+	} else {
+		GitLog.Println("Edit issue: ", err)
+	}
 	return updatedIssue, err
 }
 
-// Marks issue as closed
+// Marks issue as closed.
 func CloseIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	temp := "closed"
 	issue.State = &temp
@@ -316,6 +318,7 @@ func CloseIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	return closedIssue, err
 }
 
+// Mark issue as open.
 func OpenIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	temp := "open"
 	issue.State = &temp
@@ -323,6 +326,7 @@ func OpenIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	return closedIssue, err
 }
 
+// Locks issue so it cant be changed.
 func LockIssue(repo string, issueNum int) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.Lock(s[0], s[1], issueNum)
@@ -332,6 +336,7 @@ func LockIssue(repo string, issueNum int) error {
 	return err
 }
 
+// Unlocks issue to allow changes.
 func UnlockIssue(repo string, issueNum int) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.Unlock(s[0], s[1], issueNum)
@@ -341,6 +346,7 @@ func UnlockIssue(repo string, issueNum int) error {
 	return err
 }
 
+// Lists all the comments for a given issue.
 func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	err = nil
@@ -359,6 +365,7 @@ func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
 	}
 }
 
+// Write comments for issue to array and save it to file.
 func storecomments(comments []github.IssueComment, issueNum int) error {
 	toWrite, err := readComments()
 	if err == nil {
@@ -373,6 +380,7 @@ func storecomments(comments []github.IssueComment, issueNum int) error {
 	return err
 }
 
+// Reads in comments from comments.json.
 func readComments() ([]Comments, error) {
 	file := path + ".issue/comments.json"
 	read, err := ioutil.ReadFile(file)
@@ -389,6 +397,7 @@ func readComments() ([]Comments, error) {
 	return comments, err
 }
 
+// Comment on a issue on github.
 func Comment(repo, body string, issueNum int) (github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	comment := new(github.IssueComment)
@@ -398,6 +407,7 @@ func Comment(repo, body string, issueNum int) (github.IssueComment, error) {
 	return newComment, err
 }
 
+// Edit a comment already on github.
 func editComment(repo, body string, commentId int) (github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	comment := new(github.IssueComment)
@@ -407,18 +417,21 @@ func editComment(repo, body string, commentId int) (github.IssueComment, error) 
 	return newComment, err
 }
 
+// Remove a comment from an issue.
 func DeleteComment(repo string, commentId int) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.DeleteComment(s[0], s[1], commentId)
 	return err
 }
 
+// list all possible labels in a repo.
 func ListLabels(repo string) ([]github.Label, error) {
 	s := strings.Split(repo, "/")
 	labels, _, err := client.Issues.ListLabels(s[0], s[1], nil)
 	return labels, err
 }
 
+// Create a label for a repo.
 func CreateLabel(repo, labelName string) (github.Label, error) {
 	s := strings.Split(repo, "/")
 	label := new(github.Label)
@@ -428,6 +441,7 @@ func CreateLabel(repo, labelName string) (github.Label, error) {
 	return newLabel, err
 }
 
+// Add a label to a repo.
 func AddLabel(repo, labelName string, issueNum int) ([]github.Label, error) {
 	s := strings.Split(repo, "/")
 	label := []string{labelName}
@@ -435,6 +449,7 @@ func AddLabel(repo, labelName string, issueNum int) ([]github.Label, error) {
 	return labels, err
 }
 
+// Change the name of a label.
 func EditLabel(repo, labelName, newName string) (github.Label, error) {
 	s := strings.Split(repo, "/")
 	label := new(github.Label)
@@ -447,6 +462,7 @@ func EditLabel(repo, labelName, newName string) (github.Label, error) {
 	return editedLabel, err
 }
 
+// Remove a label from an issue.
 func RemoveLabel(repo, labelName string, issueNum int) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.RemoveLabelForIssue(s[0], s[1], issueNum, labelName)
@@ -456,6 +472,7 @@ func RemoveLabel(repo, labelName string, issueNum int) error {
 	return err
 }
 
+// Delete a label from a repo.
 func DeleteLabel(repo, labelName string) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.DeleteLabel(s[0], s[1], labelName)
@@ -465,6 +482,7 @@ func DeleteLabel(repo, labelName string) error {
 	return err
 }
 
+// Create a Milestone for a repo.
 func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	s := strings.Split(repo, "/")
 	temp := new(github.Milestone)
@@ -474,14 +492,18 @@ func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	return ms, err
 }
 
+// Add Milestone to an issue.
+// BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
 func AddMilestone() {}
 
+// List all Milestones in a repo.
 func ListMilestones(repo string) ([]github.Milestone, error) {
 	s := strings.Split(repo, "/")
 	milestones, _, err := client.Issues.ListMilestones(s[0], s[1], nil)
 	return milestones, err
 }
 
+// Change the title of a milestone in a repo.
 func EditMilestone(repo, newTitle string, mileNum int) (github.Milestone, error) {
 	s := strings.Split(repo, "/")
 	temp, _, err := client.Issues.GetMilestone(s[0], s[1], mileNum)
@@ -498,19 +520,27 @@ func EditMilestone(repo, newTitle string, mileNum int) (github.Milestone, error)
 	return milestone, err
 }
 
+// Remove Milestone to an issue.
+// BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
 func RemoveMilestone() {}
+
+// Delet a Milestone from a repo.
 func DeleteMilestone(repo string, mileNum int) error {
 	s := strings.Split(repo, "/")
 	_, err := client.Issues.DeleteMilestone(s[0], s[1], mileNum)
 	return err
 }
 
-func Repos() ([]github.Repository, error) {
+// list all all of a users repos.
+// currently unused.
+func repos() ([]github.Repository, error) {
 	repos, _, err := client.Repositories.List("", nil)
 	return repos, err
 }
 
-func OrgsList() ([]github.Organization, error) {
+// List all orgs a users a part of.
+// currently unused.
+func orgsList() ([]github.Organization, error) {
 	GitLog.Println(conf.Username)
 	orgs, _, err := client.Organizations.List(conf.Username, nil)
 	return orgs, err
