@@ -149,10 +149,12 @@ func SetUp(user, oauth string) error {
 // returns GitLog to be used to log erros
 func logSetUp() *log.Logger {
 	_, err = ioutil.ReadFile(path + ".issue/sushi.log")
+	logFile := new(os.File)
 	if err != nil {
-		err = ioutil.WriteFile(path+".issue/sushi.log", nil, 0644)
+		logFile, err = os.Create(path + ".issue/sushi.log")
+	} else {
+		logFile, err = os.OpenFile(path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	}
-	logFile, err := os.OpenFile(path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
 	}
@@ -186,6 +188,7 @@ func Login() error {
 		return err
 	}
 	log.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
+	GitLog.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
 	return nil
 }
 
@@ -282,8 +285,8 @@ func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
 	issueNum := *oldIssue.Number
 	issue := new(github.IssueRequest)
 	if len(oldIssue.Labels) != 0 {
-		var labels []string
-		for i := 0; i < len(oldIssue.Labels); i++ {
+		labels := []string{oldIssue.Labels[i].String()}
+		for i := 1; i < len(oldIssue.Labels); i++ {
 			var label string
 			label = oldIssue.Labels[i].String()
 			labels = append(labels, label)
@@ -297,9 +300,9 @@ func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
 	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
 	if err == nil {
 		_, err = Issues(repo)
-	} else {
-		GitLog.Println("Edit issue: ", err)
-	}
+	} //else {
+	GitLog.Println("Edit issue: ", err)
+	//}
 	return updatedIssue, err
 }
 

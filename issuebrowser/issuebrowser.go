@@ -1509,7 +1509,7 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 	line := strings.Split(current, ":")
 	for i := 0; i < len(issueList); i++ {
 		if line[0] == strconv.Itoa(*issueList[i].Number) {
-			if *issueList[i].State == "open" {
+			if *issueList[i].State != "open" {
 				temp, err := gitissue.OpenIssue(getRepo(), issueList[i])
 				if err != nil {
 					return err
