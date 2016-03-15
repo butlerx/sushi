@@ -890,10 +890,12 @@ func help(g *gocui.Gui, v *gocui.View) error {
 		fmt.Fprintln(helpPane, "'gg' = Window Top")
 		fmt.Fprintln(helpPane, "'G' = Window Bottom")
 		fmt.Fprintln(helpPane, "")
+		fmt.Fprintln(helpPane, "Ctrl + C = Cancel out of dialog box")
+		fmt.Fprintln(helpPane, "Ctrl + R = Refresh issue list from remote repo")
 		fmt.Fprintln(helpPane, "Ctrl + W = Enter window changing mode, nav keys to pick a window")
 		fmt.Fprintln(helpPane, "'gt' = Next window")
 		fmt.Fprintln(helpPane, "'gT' = Previous window")
-		fmt.Fprintln(helpPane, "Ctrl + C = Cancel out of dialog box")
+
 		if err := g.SetCurrentView("helpPane"); err != nil {
 			return err
 		}
