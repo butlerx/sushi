@@ -55,25 +55,24 @@ func IsSetUp() (bool, error) {
 	}
 	_, err = os.Stat(*Path + ".issue")
 	if os.IsNotExist(err) {
-		return false, err
+		return false, nil
 	}
 	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
-		return false, err
+		return false, nil
 	} else {
 		temp := new(Config)
 		if err = json.Unmarshal(file, temp); err != nil {
-			return false, err
+			return false, nil
 		}
 		if temp.Username == "" {
-			return false, err
+			return false, nil
 		}
 	}
 	return true, nil
 }
 
 // Check if being run in a git repo or a child in a git repo.
-// TODO currently doesnt work
 func checkgit() bool {
 	_, err := os.Stat(*Path + ".git")
 	if os.IsNotExist(err) {
