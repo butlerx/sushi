@@ -280,12 +280,12 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 
 // Edit a github issue.
 // Edit the issue object before passing it to this method.
-func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
+func EditIssue(repo string, oldIssue *github.Issue) (*github.Issue, error) {
 	s := strings.Split(repo, "/")
 	issueNum := *oldIssue.Number
 	issue := new(github.IssueRequest)
 	if len(oldIssue.Labels) != 0 {
-		labels := []string{oldIssue.Labels[i].String()}
+		labels := []string{oldIssue.Labels[0].String()}
 		for i := 1; i < len(oldIssue.Labels); i++ {
 			var label string
 			label = oldIssue.Labels[i].String()
@@ -295,7 +295,9 @@ func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
 	}
 	issue.Title = oldIssue.Title
 	issue.Body = oldIssue.Body
-	issue.Assignee = oldIssue.Assignee.Login
+	if oldIssue.Assignee != nil {
+		issue.Assignee = oldIssue.Assignee.Login
+	}
 	issue.State = oldIssue.State
 	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
 	if err == nil {
@@ -307,14 +309,14 @@ func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
 }
 
 // Marks issue as closed
-func CloseIssue(repo string, issue github.Issue) (*github.Issue, error) {
+func CloseIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	temp := "closed"
 	issue.State = &temp
 	closedIssue, err := EditIssue(repo, issue)
 	return closedIssue, err
 }
 
-func OpenIssue(repo string, issue github.Issue) (*github.Issue, error) {
+func OpenIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 	temp := "open"
 	issue.State = &temp
 	closedIssue, err := EditIssue(repo, issue)
