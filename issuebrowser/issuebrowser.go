@@ -560,7 +560,7 @@ func keybindings(g *gocui.Gui) error {
 
 //helper functions
 func getRepo() string {
-	dat, err := ioutil.ReadFile(".git/config")
+	dat, err := ioutil.ReadFile(*gitissue.Path + ".git/config")
 	if err != nil {
 		panic(err)
 	}
