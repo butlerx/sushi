@@ -32,13 +32,14 @@ var (
 	client          = github.NewClient(nil)
 	conf            *Config
 	folderpath, err = filepath.Abs(".")
-	path            = folderpath + "/"
+	folder          = (folderpath + "/")
+	Path            = &folder
 	GitLog          *log.Logger
 )
 
 // Write issues out to file.
-func writeIssue(toWrite []github.Issue, file string) error {
-	file = path + ".issue/" + file + ".json"
+func writeIssue(toWrite []github.Issue) error {
+	file := *Path + ".issue/issues.json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {
 		err = ioutil.WriteFile(file, b, 0644)
@@ -52,37 +53,36 @@ func IsSetUp() (bool, error) {
 		err := errors.New("Not git repo")
 		return false, err
 	}
-	_, err = os.Stat(path + ".issue")
+	_, err = os.Stat(*Path + ".issue")
 	if os.IsNotExist(err) {
-		return false, err
+		return false, nil
 	}
-	file, err := ioutil.ReadFile(path + ".issue/config.json")
+	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
-		return false, err
+		return false, nil
 	} else {
 		temp := new(Config)
 		if err = json.Unmarshal(file, temp); err != nil {
-			return false, err
+			return false, nil
 		}
 		if temp.Username == "" {
-			return false, err
+			return false, nil
 		}
 	}
 	return true, nil
 }
 
 // Check if being run in a git repo or a child in a git repo.
-// TODO currently doesnt work
 func checkgit() bool {
-	_, err := os.Stat(path + ".git")
+	_, err := os.Stat(*Path + ".git")
 	if os.IsNotExist(err) {
-		if path == "/" {
+		if *Path == "/" {
 			return false
 		} else {
-			s := strings.Split(path, "/")
-			path = "/"
-			for i := 1; i < len(s)-1; i++ {
-				path = s[i] + "/"
+			s := strings.Split(*Path, "/")
+			*Path = "/"
+			for i := 1; i < len(s)-2; i++ {
+				*Path = *Path + s[i] + "/"
 			}
 			checkgit()
 		}
@@ -95,45 +95,45 @@ func checkgit() bool {
 // Checks if the files exist and if they dont creates them.
 func SetUp(user, oauth string) error {
 	GitLog = logSetUp()
-	_, err = os.Stat(path + ".issue")
+	_, err = os.Stat(*Path + ".issue")
 	if os.IsNotExist(err) {
-		err := os.Mkdir(path+".issue", 0755)
+		err := os.Mkdir(*Path+".issue", 0755)
 		if err != nil {
 			GitLog.Println("make folder: ", err)
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(path + ".issue/config.json")
+	_, err = ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
 		temp := Config{user, oauth}
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(path+".issue/config.json", b, 0644)
+			err = ioutil.WriteFile(*Path+".issue/config.json", b, 0644)
 		} else {
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(path + ".issue/issues.json")
+	_, err = ioutil.ReadFile(*Path + ".issue/issues.json")
 	if err != nil {
 		temp := new([]github.Issue)
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(path+".issue/issues.json", b, 0644)
+			err = ioutil.WriteFile(*Path+".issue/issues.json", b, 0644)
 		} else {
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(path + ".issue/comments.json")
+	_, err = ioutil.ReadFile(*Path + ".issue/comments.json")
 	if err != nil {
 		temp := new([]Comments)
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(path+".issue/comments.json", b, 0644)
+			err = ioutil.WriteFile(*Path+".issue/comments.json", b, 0644)
 		} else {
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(path + ".gitignore")
+	_, err = ioutil.ReadFile(*Path + ".gitignore")
 	if err == nil {
 		f, _ := os.OpenFile(".gitignore", os.O_APPEND, 0446)
 		_, _ = f.WriteString(".issue/config.json")
@@ -149,12 +149,12 @@ func SetUp(user, oauth string) error {
 // Sets up Log file and creates logger object.
 // Returns GitLog to be used to log erros.
 func logSetUp() *log.Logger {
-	_, err = ioutil.ReadFile(path + ".issue/sushi.log")
+	_, err = ioutil.ReadFile(*Path + ".issue/sushi.log")
 	logFile := new(os.File)
 	if err != nil {
-		logFile, err = os.Create(path + ".issue/sushi.log")
+		logFile, err = os.Create(*Path + ".issue/sushi.log")
 	} else {
-		logFile, err = os.OpenFile(path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logFile, err = os.OpenFile(*Path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	}
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
@@ -166,7 +166,7 @@ func logSetUp() *log.Logger {
 // Logs in to github using oauth.
 // Returns error if login fails.
 func Login() error {
-	file, err := ioutil.ReadFile(path + ".issue/config.json")
+	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
 		GitLog.Println("open config: ", err)
 		os.Exit(1)
@@ -189,7 +189,7 @@ func Login() error {
 		return err
 	}
 	log.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
-	GitLog.Printf("\nLogged into: %v\n", github.Stringify(user.Login))
+	GitLog.Print("Logged into: ", github.Stringify(user.Login))
 	return nil
 }
 
@@ -234,10 +234,10 @@ func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string,
 func Issues(repo string) ([]github.Issue, error) {
 	issues, err := IssuesFilter(repo, "all", "", "", "", "", "", nil)
 	if err == nil {
-		writeIssue(issues, "issues")
+		writeIssue(issues)
 		return issues, err
 	}
-	file, err := ioutil.ReadFile(path + ".issue/issues.json")
+	file, err := ioutil.ReadFile(*Path + ".issue/issues.json")
 	if err != nil {
 		GitLog.Println("open issues: ", err)
 		os.Exit(1)
@@ -371,7 +371,7 @@ func storecomments(comments []github.IssueComment, issueNum int) error {
 	if err == nil {
 		toAppend := Comments{comments, issueNum}
 		toWrite = append(toWrite, toAppend)
-		file := path + ".issue/comments.json"
+		file := *Path + ".issue/comments.json"
 		b, err := json.Marshal(toWrite)
 		if err == nil {
 			err = ioutil.WriteFile(file, b, 0644)
@@ -382,7 +382,7 @@ func storecomments(comments []github.IssueComment, issueNum int) error {
 
 // Reads in comments from comments.json.
 func readComments() ([]Comments, error) {
-	file := path + ".issue/comments.json"
+	file := *Path + ".issue/comments.json"
 	read, err := ioutil.ReadFile(file)
 	if err != nil {
 		GitLog.Println("open comments: ", err)
