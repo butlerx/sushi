@@ -622,7 +622,11 @@ func unhide() {
 
 //GetLogin sets up the config file if it does not exist
 func GetLogin() error {
-	isUp, _ := gitissue.IsSetUp()
+	isUp, err := gitissue.IsSetUp()
+	if err != nil {
+		fmt.Fprintln(os.Stdout, "Error, sushi may only be called from inside a git repository")
+		os.Exit(1)
+	}
 	if !isUp {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter GitHub username: ")
@@ -1577,9 +1581,6 @@ func writeComment(g *gocui.Gui, v *gocui.View) error {
 			}
 		}
 	}
-	if len(comments) > 0 {
-		log.Println(len(comments))
-	}
 	num, err := strconv.Atoi(issueNum[0])
 	if err != nil {
 		return err
@@ -1592,9 +1593,7 @@ func writeComment(g *gocui.Gui, v *gocui.View) error {
 	if err := cancel(g, v); err != nil {
 		return err
 	}
-	if len(comments) > 0 {
-		log.Println(len(comments))
-	}
+	refresh(g, v)
 	return nil
 }
 
