@@ -13,11 +13,16 @@ import (
 	"strings"
 )
 
+// Structure of User config file
+// Username and oauth token stored
 type Config struct {
 	Username string
 	Token    string
 }
 
+// Structure for comments to file
+// used for storing comments offline
+// array of comments and issue number they relate to
 type Comments struct {
 	Issue []github.IssueComment
 	Num   int
@@ -31,6 +36,7 @@ var (
 	GitLog          *log.Logger
 )
 
+// Write issues out to file
 func write(toWrite []github.Issue, file string) error {
 	file = path + ".issue/" + file + ".json"
 	b, err := json.Marshal(toWrite)
@@ -40,6 +46,7 @@ func write(toWrite []github.Issue, file string) error {
 	return err
 }
 
+// Check if users config is set up and if being run in git repo
 func IsSetUp() (bool, error) {
 	if checkgit() == false {
 		err := errors.New("Not git repo")
@@ -64,6 +71,7 @@ func IsSetUp() (bool, error) {
 	return true, nil
 }
 
+// Check if being run in a git repo or a child in a git repo
 func checkgit() bool {
 	_, err := os.Stat(path + ".git")
 	if os.IsNotExist(err) {
@@ -80,8 +88,13 @@ func checkgit() bool {
 	}
 	return true
 }
+
+// Set up .issue folder, issues, comments & config file and begin logfile
+// appends to to gitignore to ignore the config file
+// Checks if the files exist and if they dont creates them
 func SetUp(user, oauth string) error {
 	GitLog = logSetUp()
+	_, err = os.Stat(path + ".issue")
 	if os.IsNotExist(err) {
 		err := os.Mkdir(path+".issue", 0755)
 		if err != nil {
@@ -127,11 +140,18 @@ func SetUp(user, oauth string) error {
 	} else {
 		ignore := []byte(".issue/config.json")
 		err = ioutil.WriteFile(".gitignore", ignore, 0644)
+		return err
 	}
-	return err
+	return nil
 }
 
+// Sets up Log file and creates logger object
+// returns GitLog to be used to log erros
 func logSetUp() *log.Logger {
+	_, err = ioutil.ReadFile(path + ".issue/sushi.log")
+	if err != nil {
+		err = ioutil.WriteFile(path+".issue/sushi.log", nil, 0644)
+	}
 	logFile, err := os.OpenFile(path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
@@ -140,6 +160,8 @@ func logSetUp() *log.Logger {
 	return GitLog
 }
 
+// Logs in to github using oauth
+// returns error if login fails
 func Login() error {
 	file, err := ioutil.ReadFile(path + ".issue/config.json")
 	if err != nil {
@@ -167,6 +189,10 @@ func Login() error {
 	return nil
 }
 
+// filters issues based on mileston, assignee, creatoror, labels or state
+// pass empty strings for things that arnt to be filtered
+// returns array of issues in order asked for
+// TODO(butlerx) filter offline issues if query of repo fails
 func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string, labels []string) ([]github.Issue, error) {
 	s := strings.Split(repo, "/")
 	sorting := new(github.IssueListByRepoOptions)
@@ -195,7 +221,12 @@ func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string,
 	return issues, err
 }
 
-// pull all issues and write them to .issue/issues.json
+// Pull all issues and write them to .issue/issues.json
+// Pulls both open and closed issues
+// Used to update issues.json
+// method for accessing issue.json
+// Returns last pull if cant connect to server
+// repo should be structured as "user/repo"
 func Issues(repo string) ([]github.Issue, error) {
 	issues, err := IssuesFilter(repo, "all", "", "", "", "", "", nil)
 	if err == nil {
@@ -216,6 +247,10 @@ func Issues(repo string) ([]github.Issue, error) {
 	return issues, err
 }
 
+// Create an issue on github.
+// requires repo and title args,
+// rest are optinal arg and can be passed empty.
+// BUG(butlerx) doesnt work in offile mode.
 func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
 	s := strings.Split(repo, "/")
 	newIssue := new(github.Issue)
@@ -240,17 +275,21 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 	}
 }
 
-func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) { // make issue put milestone at 0 for no milestone
+// Edit a github issue.
+// Edit the issue object before passing it to this method.
+func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) {
 	s := strings.Split(repo, "/")
 	issueNum := *oldIssue.Number
 	issue := new(github.IssueRequest)
-	var labels []string
-	for i := 0; i < len(oldIssue.Labels); i++ {
-		var label string
-		label = oldIssue.Labels[i].String()
-		labels = append(labels, label)
+	if len(oldIssue.Labels) != 0 {
+		var labels []string
+		for i := 0; i < len(oldIssue.Labels); i++ {
+			var label string
+			label = oldIssue.Labels[i].String()
+			labels = append(labels, label)
+		}
+		issue.Labels = &labels
 	}
-	issue.Labels = &labels
 	issue.Title = oldIssue.Title
 	issue.Body = oldIssue.Body
 	issue.Assignee = oldIssue.Assignee.Login
@@ -258,10 +297,13 @@ func EditIssue(repo string, oldIssue github.Issue) (*github.Issue, error) { // m
 	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
 	if err == nil {
 		_, err = Issues(repo)
+	} else {
+		GitLog.Println("Edit issue: ", err)
 	}
 	return updatedIssue, err
 }
 
+// Marks issue as closed
 func CloseIssue(repo string, issue github.Issue) (*github.Issue, error) {
 	temp := "closed"
 	issue.State = &temp
