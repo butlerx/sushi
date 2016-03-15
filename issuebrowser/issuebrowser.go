@@ -1522,8 +1522,10 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 				issueList[i] = *temp
 				break
 			}
-
 		}
+	}
+	if err := showIssues(g); err != nil {
+		return err
 	}
 	return nil
 }
