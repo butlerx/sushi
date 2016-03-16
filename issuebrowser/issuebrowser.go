@@ -317,7 +317,7 @@ func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "sortChoice", "filterChoice"}
 	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "commentBrowser", "sortChoice", "filterChoice"}
-	dialogBoxes := []string{"helpPane", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentBrowser", "commentViewer"}
+	dialogBoxes := []string{"helpPane", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentDeleter", "commentBrowser", "commentViewer"}
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF1, gocui.ModNone, help); err != nil {
@@ -372,6 +372,30 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("commentBrowser", gocui.KeyEnter, gocui.ModNone, editComment); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentDeleter", gocui.KeyArrowUp, gocui.ModNone, cursorupGetComments); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentDeleter", 'k', gocui.ModNone, cursorupGetComments); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentDeleter", gocui.KeyArrowDown, gocui.ModNone, cursordownGetComments); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentDeleter", 'j', gocui.ModNone, cursordownGetComments); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentDeleter", gocui.KeyEnter, gocui.ModNone, deleteComment); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("commentpane", gocui.KeyCtrlD, gocui.ModNone, openCommentDeleter); err != nil {
 		return err
 	}
 
@@ -912,9 +936,12 @@ func help(g *gocui.Gui, v *gocui.View) error {
 		fmt.Fprintln(helpPane, "'gg' = Window Top")
 		fmt.Fprintln(helpPane, "'G' = Window Bottom")
 		fmt.Fprintln(helpPane, "")
-		fmt.Fprintln(helpPane, "Ctrl + n = New Issue/Comment/Label")
+		fmt.Fprintln(helpPane, "Ctrl + N = New Issue/Comment/Label")
 		fmt.Fprintln(helpPane, "Ctrl + C = Cancel out of dialog box")
 		fmt.Fprintln(helpPane, "Ctrl + R = Refresh issue list from remote repo")
+		fmt.Fprintln(helpPane, "Ctrl + E = Edit Comment/Label")
+		fmt.Fprintln(helpPane, "Ctrl + D = Delete Comment/Label")
+		fmt.Fprintln(helpPane, "")
 		fmt.Fprintln(helpPane, "Ctrl + W = Enter window changing mode, nav keys to pick a window")
 		fmt.Fprintln(helpPane, "'gt' = Next window")
 		fmt.Fprintln(helpPane, "'gT' = Previous window")
@@ -1659,7 +1686,7 @@ func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 				}
 			}
 			for i := 0; i < len(comments[commentIndex]); i++ {
-				fmt.Fprintln(commentBrowser, strconv.Itoa(*comments[commentIndex][i].ID)+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format("Mon Jan 2"))
+				fmt.Fprintln(commentBrowser, strconv.Itoa(*comments[commentIndex][i].ID)+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
 			}
 		} else {
 			fmt.Fprintln(commentBrowser, "This issue has no comments")
@@ -1692,6 +1719,12 @@ func editComment(g *gocui.Gui, v *gocui.View) error {
 		}
 		return nil
 	}
+	commentEditPrompt, err := g.View("commentEditPrompt")
+	if err != nil {
+		return err
+	}
+	commentEditPrompt.Clear()
+	fmt.Fprintln(commentEditPrompt, "Press enter to write out changes\n\nCtrl+C to cancel")
 	if err := g.SetCurrentView("commentViewer"); err != nil {
 		return err
 	}
@@ -1714,6 +1747,9 @@ func writeEditedComment(g *gocui.Gui, v *gocui.View) error {
 		return err
 	}
 	ID, err := strconv.Atoi((strings.Split(commentLine, ":"))[0])
+	if err != nil {
+		return err
+	}
 	if _, err = gitissue.EditComment(getRepo(), v.Buffer(), ID); err != nil {
 		return err
 	}
@@ -1727,8 +1763,109 @@ func writeEditedComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func openCommentDeleter(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	issueIndex := 0
+	commentIndex := 0
+	maxX, maxY := g.Size()
+	if commentDeletePrompt, err := g.SetView("commentDeletePrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		fmt.Fprintln(commentDeletePrompt, "Select the comment you wish to delete\n\nCtrl+C to cancel")
+	}
+	if commentDeleter, err := g.SetView("commentDeleter", maxX/4, maxY/3, maxX/2, maxY-(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		commentDeleter.Highlight = true
+		browser, err := g.View("browser")
+		if err != nil {
+			return err
+		}
+		_, cy := browser.Cursor()
+		issueLine, err := browser.Line(cy)
+		if err != nil {
+			return err
+		}
+		issueNum := strings.Split(issueLine, ":")
+		var URL string
+		for ; issueIndex < len(issueList); issueIndex++ {
+			if issueNum[0] == strconv.Itoa(*issueList[issueIndex].Number) {
+				URL = *issueList[issueIndex].URL
+				break
+			}
+		}
+		if *issueList[issueIndex].Comments > 0 {
+			for ; commentIndex < len(comments); commentIndex++ {
+				if len(comments[commentIndex]) > 0 {
+					if URL == *comments[commentIndex][0].IssueURL {
+						break
+					}
+				}
+			}
+			for i := 0; i < len(comments[commentIndex]); i++ {
+				fmt.Fprintln(commentDeleter, strconv.Itoa(*comments[commentIndex][i].ID)+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
+			}
+		} else {
+			fmt.Fprintln(commentDeleter, "This issue has no comments")
+		}
+		if err := g.SetCurrentView("commentDeleter"); err != nil {
+			return err
+		}
+	}
+	if commentViewer, err := g.SetView("commentViewer", maxX/2, maxY/3, maxX-(maxX/4), maxY-(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		commentViewer.Wrap = true
+		if *issueList[issueIndex].Comments > 0 {
+			fmt.Fprintln(commentViewer, *comments[commentIndex][0].Body)
+		}
+	}
+	return nil
+}
+
+func deleteComment(g *gocui.Gui, v *gocui.View) error {
+	_, cy := v.Cursor()
+	commentLine, err := v.Line(cy)
+	if err != nil {
+		return err
+	}
+	if commentLine == "This issue has no comments" {
+		if err := cancel(g, v); err != nil {
+			return err
+		}
+		return nil
+	}
+	ID, err := strconv.Atoi((strings.Split(commentLine, ":"))[0])
+	if err != nil {
+		return err
+	}
+	if err = gitissue.DeleteComment(getRepo(), ID); err != nil {
+		return err
+	}
+	if err = cancel(g, v); err != nil {
+		return err
+	}
+	if err = refresh(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func cursorupGetComments(g *gocui.Gui, v *gocui.View) error {
 	if err := cursorup(g, v); err != nil {
+		return err
+	}
+	if err := getLineComment(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cursordownGetComments(g *gocui.Gui, v *gocui.View) error {
+	if err := cursordown(g, v); err != nil {
 		return err
 	}
 	if err := getLineComment(g, v); err != nil {
@@ -1787,16 +1924,6 @@ func getLineComment(g *gocui.Gui, v *gocui.View) error {
 			fmt.Fprintln(commentViewer, *comments[commentIndex][i].Body)
 			break
 		}
-	}
-	return nil
-}
-
-func cursordownGetComments(g *gocui.Gui, v *gocui.View) error {
-	if err := cursordown(g, v); err != nil {
-		return err
-	}
-	if err := getLineComment(g, v); err != nil {
-		return err
 	}
 	return nil
 }
@@ -1955,6 +2082,19 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		if err := g.DeleteView("commentBrowser"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("commentViewer"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+	} else if (g.CurrentView()).Name() == "commentDeleter" {
+		if err := g.DeleteView("commentDeletePrompt"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("commentDeleter"); err != nil {
 			return err
 		}
 		if err := g.DeleteView("commentViewer"); err != nil {
