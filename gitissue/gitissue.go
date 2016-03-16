@@ -6,6 +6,7 @@ import (
 
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -494,6 +495,7 @@ func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 
 // Add Milestone to an issue.
 // BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
+// Bug is noted in library docs.
 func AddMilestone() {}
 
 // List all Milestones in a repo.
@@ -522,6 +524,7 @@ func EditMilestone(repo, newTitle string, mileNum int) (github.Milestone, error)
 
 // Remove Milestone to an issue.
 // BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
+// Bug is noted in library docs.
 func RemoveMilestone() {}
 
 // Delet a Milestone from a repo.
@@ -532,6 +535,21 @@ func DeleteMilestone(repo string, mileNum int) error {
 }
 
 // monitor for change in repo
+// rings terminal bell and returns true if something happened in repo
+// returns false if nothing changed
+func WatchRepo(repo string) bool {
+	s := strings.Split(repo, "/")
+	subscription, _, err := client.Activity.GetRepositorySubscription(s[0], s[1])
+	if err == nil && subscription != nil {
+		notification, _, err := client.Activity.GetThread(*subscription.ThreadURL)
+		if err == nil && *notification.Unread == true {
+			fmt.Print("\a")
+			_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
+			return true
+		}
+	}
+	return false
+}
 
 // list all all of a users repos.
 // currently unused.
