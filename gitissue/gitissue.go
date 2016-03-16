@@ -408,7 +408,7 @@ func Comment(repo, body string, issueNum int) (github.IssueComment, error) {
 }
 
 // Edit a comment already on github.
-func editComment(repo, body string, commentId int) (github.IssueComment, error) {
+func EditComment(repo, body string, commentId int) (github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	comment := new(github.IssueComment)
 	comment.Body = &body
