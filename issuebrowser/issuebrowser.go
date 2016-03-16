@@ -1673,7 +1673,7 @@ func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 			return err
 		}
 		commentViewer.Wrap = true
-		if len(comments[commentIndex]) > 0 {
+		if *issueList[issueIndex].Comments > 0 {
 			fmt.Fprintln(commentViewer, *comments[commentIndex][0].Body)
 		}
 	}
@@ -1681,6 +1681,17 @@ func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 }
 
 func editComment(g *gocui.Gui, v *gocui.View) error {
+	_, cy := v.Cursor()
+	commentLine, err := v.Line(cy)
+	if err != nil {
+		return err
+	}
+	if commentLine == "This issue has no comments" {
+		if err := cancel(g, v); err != nil {
+			return err
+		}
+		return nil
+	}
 	if err := g.SetCurrentView("commentViewer"); err != nil {
 		return err
 	}
