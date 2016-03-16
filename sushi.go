@@ -11,7 +11,8 @@ func main() {
 	var path string
 	switch {
 	case len(os.Args) == 1:
-		fmt.Println("Please add an arguement")
+		//fmt.Println("Please add an arguement")
+		issuebrowser.Show()
 
 	case os.Args[1] == "ilist":
 		if len(os.Args) != 2 { //check to see if you have cmd line args
