@@ -591,21 +591,24 @@ func DeleteMilestone(repo string, mileNum int) error {
 	return err
 }
 
-// monitor for change in repo
-// rings terminal bell and returns true if something happened in repo
+// Monitor for change in repo.
+// Rings terminal bell and
+// returns true and the reason if something happened in repo.
 // returns false if nothing changed
-func WatchRepo(repo string) (string, bool) {
+func WatchRepo(repo string) (string, string, bool) {
 	s := strings.Split(repo, "/")
 	subscription, _, err := client.Activity.GetRepositorySubscription(s[0], s[1])
 	if err == nil && subscription != nil {
 		notification, _, err := client.Activity.GetThread(*subscription.ThreadURL)
 		if err == nil && *notification.Unread == true {
-			fmt.Print("\a")
-			_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
-			return *notification.Reason, true
+			if *notification.Reason != "state_change" {
+				fmt.Print("\a")
+				_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
+				return *notification.Reason, *notification.Subject.Title, true
+			}
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 // list all all of a users repos.
