@@ -210,15 +210,29 @@ func Show() {
 	window.SelFgColor = gocui.ColorBlack
 	window.Cursor = true
 	timer := cron.New()
-	timer.AddFunc("0 5 * * * *", func() { issueList = getIssues() })
 	timer.AddFunc("0 5 * * * *", func() {
+		reason, subject, update := gitissue.WatchRepo(getRepo())
+		if update {
+			fmt.Print("\a")
+			notifications, err := window.View("notifications")
+			if err != nil {
+				log.Panic(err)
+			}
+			notifications.Clear()
+			fmt.Fprintln(notifications, reason+": "+subject)
+		}
+	})
+	timer.AddFunc("0 5 * * * *", func() {
+		issueList = getIssues()
 		browser, err := window.View("browser")
 		if err != nil {
 			log.Panic(err)
 		}
-		sortIssues(window, browser)
+		if err := sortIssues(window, browser); err != nil {
+			log.Panic(err)
+		}
+		comments = getComments(len(issueList))
 	})
-	timer.AddFunc("0 5 * * * *", func() { comments = getComments(len(issueList)) })
 	timer.Start()
 
 	if err := window.MainLoop(); err != nil && err != gocui.ErrQuit {
@@ -306,11 +320,16 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 	}
-	if infobar, err := g.SetView("infobar", -1, maxY-2, maxX, maxY); err != nil {
+	if infobar, err := g.SetView("infobar", -1, maxY-2, maxX/3, maxY); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		fmt.Fprintln(infobar, "F1/'?' = Help,\tq = Quit")
+	}
+	if _, err := g.SetView("notifications", maxX/3, maxY-2, maxX, maxY); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
 	}
 	return nil
 }
