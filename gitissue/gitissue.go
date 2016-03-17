@@ -91,6 +91,26 @@ func checkgit() bool {
 	return true
 }
 
+// Set Auth token and password in config
+func setUser(user, oauth string) error {
+	temp := Config{user, oauth}
+	b, err := json.Marshal(temp)
+	if err == nil {
+		err = ioutil.WriteFile(*Path+".issue/config.json", b, 0644)
+	}
+	return nil
+}
+
+// Change user name and Auth token and relogin
+func ChangeLogin(user, oauth string) error {
+	err := setUser(user, oauth)
+	if err != nil {
+		return err
+	}
+	err = Login()
+	return err
+}
+
 // Set up .issue folder, issues, comments & config file and begin logfile.
 // Appends to to gitignore to ignore the config file.
 // Checks if the files exist and if they dont creates them.
@@ -106,11 +126,8 @@ func SetUp(user, oauth string) error {
 	}
 	_, err = ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
-		temp := Config{user, oauth}
-		b, err := json.Marshal(temp)
-		if err == nil {
-			err = ioutil.WriteFile(*Path+".issue/config.json", b, 0644)
-		} else {
+		err = setUser(user, oauth)
+		if err != nil {
 			return err
 		}
 	}
@@ -442,7 +459,7 @@ func CreateLabel(repo, labelName string) (github.Label, error) {
 	return newLabel, err
 }
 
-// Add a label to a repo.
+// Add a label to a issue.
 func AddLabel(repo, labelName string, issueNum int) ([]github.Label, error) {
 	s := strings.Split(repo, "/")
 	label := []string{labelName}
