@@ -1,6 +1,7 @@
 package gitissue
 
 import (
+	"github.com/butlerx/AgileGit/encrypt"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 
@@ -19,6 +20,7 @@ import (
 type Config struct {
 	Username string
 	Token    string
+	secure   bool
 }
 
 // Structure for comments to file
@@ -31,7 +33,7 @@ type Comments struct {
 
 var (
 	client          = github.NewClient(nil)
-	conf            *Config
+	Conf            *Config
 	folderpath, err = filepath.Abs(".")
 	folder          = (folderpath + "/")
 	Path            = &folder
@@ -91,9 +93,17 @@ func checkgit() bool {
 	return true
 }
 
-// Set Auth token and password in config
-func setUser(user, oauth string) error {
-	temp := Config{user, oauth}
+// Set Auth token and password in config.
+// Pass an empty string if the user doesnt want to secure there oauth
+func setUser(user, oauth, userkey string) error {
+	temp := new(Config)
+	if userkey == "" {
+		temp = &Config{user, oauth, false}
+	} else {
+		key := []byte(userkey)
+		oauth := encrypt.Encrypt(key, oauth)
+		temp = &Config{user, oauth, true}
+	}
 	b, err := json.Marshal(temp)
 	if err == nil {
 		err = ioutil.WriteFile(*Path+".issue/config.json", b, 0644)
@@ -101,20 +111,45 @@ func setUser(user, oauth string) error {
 	return nil
 }
 
-// Change user name and Auth token and relogin
-func ChangeLogin(user, oauth string) error {
-	err := setUser(user, oauth)
+// Change user encyption key
+func ChangeKey(oldKey, newKey string) error {
+	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
+	if err != nil {
+		GitLog.Println("open config: ", err)
+		os.Exit(1)
+	}
+	temp := new(Config)
+	if err = json.Unmarshal(file, temp); err != nil {
+		GitLog.Println("parse config: ", err)
+		os.Exit(1)
+	}
+	Conf = temp
+	token := Conf.Token
+	if Conf.secure {
+		key := []byte(oldKey)
+		token = encrypt.Decrypt(key, token)
+		if err != nil {
+			return err
+		}
+	}
+	err = ChangeLogin(Conf.Username, token, newKey)
+	return err
+}
+
+// Change user name and Auth token and relogin.
+func ChangeLogin(user, oauth, key string) error {
+	err := setUser(user, oauth, key)
 	if err != nil {
 		return err
 	}
-	err = Login()
+	err = Login(key)
 	return err
 }
 
 // Set up .issue folder, issues, comments & config file and begin logfile.
 // Appends to to gitignore to ignore the config file.
 // Checks if the files exist and if they dont creates them.
-func SetUp(user, oauth string) error {
+func SetUp(user, oauth, key string) error {
 	GitLog = logSetUp()
 	_, err = os.Stat(*Path + ".issue")
 	if os.IsNotExist(err) {
@@ -126,7 +161,7 @@ func SetUp(user, oauth string) error {
 	}
 	_, err = ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
-		err = setUser(user, oauth)
+		err = setUser(user, oauth, key)
 		if err != nil {
 			return err
 		}
@@ -183,7 +218,7 @@ func logSetUp() *log.Logger {
 
 // Logs in to github using oauth.
 // Returns error if login fails.
-func Login() error {
+func Login(userkey string) error {
 	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
 		GitLog.Println("open config: ", err)
@@ -194,9 +229,14 @@ func Login() error {
 		GitLog.Println("parse config: ", err)
 		os.Exit(1)
 	}
-	conf = temp
+	Conf = temp
+	token := Conf.Token
+	if Conf.secure {
+		key := []byte(userkey)
+		token = encrypt.Decrypt(key, token)
+	}
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: conf.Token},
+		&oauth2.Token{AccessToken: token},
 	)
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
 	client = github.NewClient(tc)
@@ -578,7 +618,7 @@ func repos() ([]github.Repository, error) {
 // List all orgs a users a part of.
 // currently unused.
 func orgsList() ([]github.Organization, error) {
-	GitLog.Println(conf.Username)
-	orgs, _, err := client.Organizations.List(conf.Username, nil)
+	GitLog.Println(Conf.Username)
+	orgs, _, err := client.Organizations.List(Conf.Username, nil)
 	return orgs, err
 }
