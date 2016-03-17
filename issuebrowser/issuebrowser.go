@@ -21,6 +21,7 @@ import (
 var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
+var labelList []github.Label
 
 //typeCasting Issues so that each has a different sort method, allowing issues to be sorted by any heading
 type byNumber []github.Issue
@@ -174,6 +175,7 @@ var tempIssueLabels = make([]string, 0)
 var entryCount = 0    //used to record which entry of a dialog the user is on
 var issueState = true //true = open issues, false = closed issues
 
+var changed bool
 var previousView *gocui.View
 
 //used to record sorting order
@@ -315,9 +317,9 @@ func layout(g *gocui.Gui) error {
 
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
-	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "sortChoice", "filterChoice"}
-	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "commentBrowser", "sortChoice", "filterChoice"}
-	dialogBoxes := []string{"helpPane", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentDeleter", "commentBrowser", "commentViewer"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "sortChoice", "filterChoice"}
+	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "commentBrowser", "sortChoice", "filterChoice"}
+	dialogBoxes := []string{"helpPane", "labelBrowser", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentDeleter", "commentBrowser", "commentViewer"}
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF1, gocui.ModNone, help); err != nil {
@@ -395,6 +397,10 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("labelBrowser", gocui.KeyEnter, gocui.ModNone, writeLabel); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("commentpane", gocui.KeyCtrlD, gocui.ModNone, openCommentDeleter); err != nil {
 		return err
 	}
@@ -426,6 +432,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("commentpane", gocui.KeyCtrlN, gocui.ModNone, newComment); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", gocui.KeyCtrlN, gocui.ModNone, addLabel); err != nil {
 		return err
 	}
 
@@ -685,11 +695,11 @@ func GetLogin() error {
 			pass = pass[:(len(pass) - 1)]
 		}
 		unhide()
-		if err := gitissue.SetUp(user, pass); err != nil {
+		if err := gitissue.SetUp(user, pass, ""); err != nil {
 			return err
 		}
 	} else {
-		if err := gitissue.SetUp("", ""); err != nil {
+		if err := gitissue.SetUp("", "", ""); err != nil {
 			return err
 		}
 	}
@@ -700,11 +710,16 @@ func setUp() error {
 	if err := GetLogin(); err != nil {
 		return err
 	}
-	if err := gitissue.Login(); err != nil {
+	if err := gitissue.Login(""); err != nil {
 		return err
 	}
+	var err error
 	issueList = getIssues()
 	comments = getComments(len(issueList))
+	labelList, err = gitissue.ListLabels(getRepo())
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1099,8 +1114,13 @@ func getSortOrder(g *gocui.Gui, v *gocui.View) error {
 }
 
 func refresh(g *gocui.Gui, v *gocui.View) error {
+	var err error
 	issueList = getIssues()
 	comments = getComments(len(issueList))
+	labelList, err = gitissue.ListLabels(getRepo())
+	if err != nil {
+		return err
+	}
 	browser, err := g.View("browser")
 	if err != nil {
 		return err
@@ -1928,6 +1948,91 @@ func getLineComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func addLabel(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	maxX, maxY := g.Size()
+	if labelPropmt, err := g.SetView("labelPrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		labelPropmt.Wrap = true
+		fmt.Fprintln(labelPropmt, "Please choose from the list of labels below.\nPress enter to add a label to the issue.\n\nCtrl+C to exit")
+	}
+	if labelBrowser, err := g.SetView("labelBrowser", maxX/4, maxY/3, maxX/2, maxY-(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		labelBrowser.Highlight = true
+		for i := 0; i < len(labelList); i++ {
+			fmt.Fprintln(labelBrowser, *labelList[i].Name)
+		}
+		if err := g.SetCurrentView("labelBrowser"); err != nil {
+			return err
+		}
+	}
+
+	if labelViewer, err := g.SetView("labelViewer", maxX/2, maxY/3, maxX-(maxX/4), maxY-(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		browser, err := g.View("browser")
+		if err != nil {
+			return err
+		}
+		_, cy := browser.Cursor()
+		issueLine, err := browser.Line(cy)
+		if err != nil {
+			return err
+		}
+		issueNum := (strings.Split(issueLine, ":"))[0]
+		for i := 0; i < len(issueList); i++ {
+			if issueNum == strconv.Itoa(*issueList[i].Number) {
+				for j := 0; j < len(issueList[i].Labels); j++ {
+					fmt.Fprintln(labelViewer, *issueList[i].Labels[j].Name)
+				}
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func writeLabel(g *gocui.Gui, v *gocui.View) error {
+	changed = true
+	labelBrowser, err := g.View("labelBrowser")
+	if err != nil {
+		return err
+	}
+	_, cy := labelBrowser.Cursor()
+	label, err := labelBrowser.Line(cy)
+	if err != nil {
+		return err
+	}
+	labelViewer, err := g.View("labelViewer")
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(labelViewer, label)
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	_, cy = browser.Cursor()
+	issueLine, err := browser.Line(cy)
+	if err != nil {
+		return err
+	}
+	issueNum, err := strconv.Atoi((strings.Split(issueLine, ":"))[0])
+	if err != nil {
+		return err
+	}
+	_, err = gitissue.AddLabel(getRepo(), label, issueNum)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func newIssue(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	maxX, maxY := g.Size()
@@ -2102,6 +2207,25 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 		}
 		if err := g.SetCurrentView(previousView.Name()); err != nil {
 			return err
+		}
+	} else if (g.CurrentView()).Name() == "labelBrowser" {
+		if err := g.DeleteView("labelPrompt"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("labelBrowser"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("labelViewer"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
+		}
+		if changed == true {
+			changed = false
+			if err := refresh(g, v); err != nil {
+				return err
+			}
 		}
 	} else if (g.CurrentView()).Name() == "helpPane" {
 		if err := g.DeleteView("helpPane"); err != nil {
