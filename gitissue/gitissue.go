@@ -540,6 +540,13 @@ func DeleteLabel(repo, labelName string) error {
 	return err
 }
 
+// Get a list of all possible assingees
+func PossibleAssignees(repo string) ([]github.User, error) {
+	s := strings.Split(repo, "/")
+	assignees, _, err := client.Issues.ListAssignees(s[0], s[1], nil)
+	return assignees, err
+}
+
 // Create a Milestone for a repo.
 func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 	s := strings.Split(repo, "/")
