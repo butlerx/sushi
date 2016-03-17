@@ -317,9 +317,9 @@ func layout(g *gocui.Gui) error {
 
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
-	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "sortChoice", "filterChoice"}
-	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "commentBrowser", "sortChoice", "filterChoice"}
-	dialogBoxes := []string{"helpPane", "labelBrowser", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentDeleter", "commentBrowser", "commentViewer"}
+	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "labelRemover", "sortChoice", "filterChoice"}
+	controlWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "labelRemover", "commentBrowser", "sortChoice", "filterChoice"}
+	dialogBoxes := []string{"helpPane", "labelBrowser", "labelRemover", "sortChoice", "filterChoice", "issueEd", "commentBody", "commentDeleter", "commentBrowser", "commentViewer"}
 
 	for i := 0; i < len(mainWindows); i++ {
 		if err := g.SetKeybinding(mainWindows[i], gocui.KeyF1, gocui.ModNone, help); err != nil {
@@ -401,6 +401,10 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 
+	if err := g.SetKeybinding("labelRemover", gocui.KeyEnter, gocui.ModNone, removeLabel); err != nil {
+		return err
+	}
+
 	if err := g.SetKeybinding("commentpane", gocui.KeyCtrlD, gocui.ModNone, openCommentDeleter); err != nil {
 		return err
 	}
@@ -436,6 +440,10 @@ func keybindings(g *gocui.Gui) error {
 	}
 
 	if err := g.SetKeybinding("labelpane", gocui.KeyCtrlN, gocui.ModNone, addLabel); err != nil {
+		return err
+	}
+
+	if err := g.SetKeybinding("labelpane", gocui.KeyCtrlD, gocui.ModNone, openLabelRemover); err != nil {
 		return err
 	}
 
@@ -1997,6 +2005,81 @@ func addLabel(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func openLabelRemover(g *gocui.Gui, v *gocui.View) error {
+	previousView = v
+	maxX, maxY := g.Size()
+	if labelPropmt, err := g.SetView("labelPrompt", maxX/4, maxY/6, maxX-(maxX/4), maxY/3); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		labelPropmt.Wrap = true
+		fmt.Fprintln(labelPropmt, "Please choose from the list of labels below.\nPress enter to remove a label from an issue.\n\nCtrl+C to exit")
+	}
+	if labelRemover, err := g.SetView("labelRemover", maxX/4, maxY/3, maxX-(maxX/4), maxY-(maxY/6)); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		labelRemover.Highlight = true
+		browser, err := g.View("browser")
+		if err != nil {
+			return err
+		}
+		_, cy := browser.Cursor()
+		issueLine, err := browser.Line(cy)
+		if err != nil {
+			return err
+		}
+		issueNum := (strings.Split(issueLine, ":")[0])
+		for i := 0; i < len(issueList); i++ {
+			if issueNum == strconv.Itoa(*issueList[i].Number) {
+				for j := 0; j < len(issueList[i].Labels); j++ {
+					fmt.Fprintln(labelRemover, *issueList[i].Labels[j].Name)
+				}
+				break
+			}
+		}
+		if err := g.SetCurrentView("labelRemover"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeLabel(g *gocui.Gui, v *gocui.View) error {
+	labelRemover, err := g.View("labelRemover")
+	if err != nil {
+		return err
+	}
+	_, cy := labelRemover.Cursor()
+	label, err := labelRemover.Line(cy)
+	if err != nil {
+		return err
+	}
+	browser, err := g.View("browser")
+	if err != nil {
+		return err
+	}
+	_, cy = browser.Cursor()
+	issueLine, err := browser.Line(cy)
+	if err != nil {
+		return err
+	}
+	issueNum, err := strconv.Atoi((strings.Split(issueLine, ":"))[0])
+	if err != nil {
+		return err
+	}
+	if err := gitissue.RemoveLabel(getRepo(), label, issueNum); err != nil {
+		return err
+	}
+	if err := cancel(g, v); err != nil {
+		return err
+	}
+	if err := refresh(g, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 func writeLabel(g *gocui.Gui, v *gocui.View) error {
 	changed = true
 	labelBrowser, err := g.View("labelBrowser")
@@ -2226,6 +2309,16 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 			if err := refresh(g, v); err != nil {
 				return err
 			}
+		}
+	} else if (g.CurrentView()).Name() == "labelRemover" {
+		if err := g.DeleteView("labelRemover"); err != nil {
+			return err
+		}
+		if err := g.DeleteView("labelPrompt"); err != nil {
+			return err
+		}
+		if err := g.SetCurrentView(previousView.Name()); err != nil {
+			return err
 		}
 	} else if (g.CurrentView()).Name() == "helpPane" {
 		if err := g.DeleteView("helpPane"); err != nil {
