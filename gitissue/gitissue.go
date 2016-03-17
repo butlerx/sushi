@@ -151,13 +151,9 @@ func ChangeLogin(user, oauth, key string) error {
 // Checks if the files exist and if they dont creates them.
 func SetUp(user, oauth, key string) error {
 	GitLog = logSetUp()
-	_, err = os.Stat(*Path + ".issue")
-	if os.IsNotExist(err) {
-		err := os.Mkdir(*Path+".issue", 0755)
-		if err != nil {
-			GitLog.Println("make folder: ", err)
-			return err
-		}
+	err := makeFolder()
+	if err != nil {
+		return err
 	}
 	_, err = ioutil.ReadFile(*Path + ".issue/config.json")
 	if err != nil {
@@ -199,9 +195,25 @@ func SetUp(user, oauth, key string) error {
 	return nil
 }
 
+func makeFolder() error {
+	_, err = os.Stat(*Path + ".issue")
+	if os.IsNotExist(err) {
+		err := os.Mkdir(*Path+".issue", 0755)
+		if err != nil {
+			log.Println("make folder: ", err)
+			return err
+		}
+	}
+	return nil
+}
+
 // Sets up Log file and creates logger object.
 // Returns GitLog to be used to log erros.
 func logSetUp() *log.Logger {
+	err := makeFolder()
+	if err != nil {
+		return nil
+	}
 	_, err = ioutil.ReadFile(*Path + ".issue/sushi.log")
 	logFile := new(os.File)
 	if err != nil {
