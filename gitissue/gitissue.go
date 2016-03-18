@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -77,18 +78,10 @@ func IsSetUp() (bool, error) {
 
 // Check if being run in a git repo or a child in a git repo.
 func checkgit() bool {
-	_, err := os.Stat(*Path + ".git")
-	if os.IsNotExist(err) {
-		if *Path == "/" {
-			return false
-		} else {
-			s := strings.Split(*Path, "/")
-			*Path = "/"
-			for i := 1; i < len(s)-2; i++ {
-				*Path = *Path + s[i] + "/"
-			}
-			checkgit()
-		}
+	cmd := exec.Command("git", "status")
+	err := cmd.Run()
+	if err != nil {
+		return false
 	}
 	return true
 }
