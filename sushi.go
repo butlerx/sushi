@@ -11,7 +11,6 @@ func main() {
 	var path string
 	switch {
 	case len(os.Args) == 1:
-		//fmt.Println("Please add an arguement")
 		issuebrowser.Show()
 
 	case os.Args[1] == "ilist":

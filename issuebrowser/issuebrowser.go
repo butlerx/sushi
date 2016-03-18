@@ -18,6 +18,7 @@ import (
 	"github.com/robfig/cron"
 )
 
+var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
 var labelList []github.Label
@@ -184,6 +185,11 @@ var previousView *gocui.View
 //used to record sorting order
 var sortChoice string
 var orderChoice string
+
+// PassArgs allows the calling program to pass a file path as a string
+func PassArgs(s string) {
+	path = s
+}
 
 //used to record filter order
 var filterHeading string
@@ -653,8 +659,14 @@ func getRepo() string {
 			ans = sublist[len(sublist)-1]
 			if strings.HasPrefix(ans, ":") {
 				ans = ans[1:(len(ans) - 4)]
+				if strings.HasSuffix(ans, ".git") {
+					ans = ans[:len(ans)-4]
+				}
 			} else {
 				ans = ans[1:]
+				if strings.HasSuffix(ans, ".git") {
+					ans = ans[:len(ans)-4]
+				}
 			}
 		}
 	}
