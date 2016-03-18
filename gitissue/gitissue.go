@@ -7,7 +7,6 @@ import (
 
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -17,10 +16,11 @@ import (
 
 // Structure of User config file
 // Username and oauth token stored
+// check if user wants the token secured
 type Config struct {
 	Username string
 	Token    string
-	secure   bool
+	Secure   bool
 }
 
 // Structure for comments to file
@@ -125,7 +125,7 @@ func ChangeKey(oldKey, newKey string) error {
 	}
 	Conf = temp
 	token := Conf.Token
-	if Conf.secure {
+	if Conf.Secure {
 		key := []byte(oldKey)
 		token = encrypt.Decrypt(key, token)
 		if err != nil {
@@ -243,7 +243,7 @@ func Login(userkey string) error {
 	}
 	Conf = temp
 	token := Conf.Token
-	if Conf.secure {
+	if Conf.Secure {
 		key := []byte(userkey)
 		token = encrypt.Decrypt(key, token)
 	}
@@ -325,7 +325,7 @@ func Issues(repo string) ([]github.Issue, error) {
 // Requires repo and title args,
 // rest are optinal arg and can be passed empty.
 // Make issue put milestone at 0 for no milestone.
-// BUG(butlerx) doesnt work in offile mode.
+// BUG(butlerx) Issue Creation doesnt work in offile mode.
 func MakeIssue(repo, title, body, assignee string, milestone int, labels []string) (*github.Issue, error) {
 	s := strings.Split(repo, "/")
 	newIssue := new(github.Issue)
@@ -570,7 +570,7 @@ func CreateMilestone(repo, milestone string) (github.Milestone, error) {
 }
 
 // Add Milestone to an issue.
-// BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
+// BUG(butlerx) Currently adding a milestone is not supported as milestones in the api are a mix of strings and ints.
 // Bug is noted in library docs.
 func AddMilestone() {}
 
@@ -599,7 +599,7 @@ func EditMilestone(repo, newTitle string, mileNum int) (github.Milestone, error)
 }
 
 // Remove Milestone to an issue.
-// BUG(butlerx) currently not supported as milestones in the api are a mix of strings and ints.
+// BUG(butlerx) currently Removing milestones is not supported as milestones in the api are a mix of strings and ints.
 // Bug is noted in library docs.
 func RemoveMilestone() {}
 
@@ -620,11 +620,8 @@ func WatchRepo(repo string) (string, string, bool) {
 	if err == nil && subscription != nil {
 		notification, _, err := client.Activity.GetThread(*subscription.ThreadURL)
 		if err == nil && *notification.Unread == true {
-			if *notification.Reason != "state_change" {
-				fmt.Print("\a")
-				_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
-				return *notification.Reason, *notification.Subject.Title, true
-			}
+			_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
+			return *notification.Reason, *notification.Subject.Title, true
 		}
 	}
 	return "", "", false
