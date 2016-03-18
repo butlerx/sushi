@@ -18,7 +18,6 @@ import (
 	"github.com/robfig/cron"
 )
 
-var path = "./"
 var issueList []github.Issue
 var comments [][]github.IssueComment
 var labelList []github.Label
@@ -35,6 +34,7 @@ type byCreatedAt []github.Issue
 type byUpdatedAt []github.Issue
 type byMilestone []github.Issue
 
+//Len returns the length of the array to be sorted
 func (iss byNumber) Len() int {
 	return len(iss)
 }
@@ -66,6 +66,7 @@ func (iss byMilestone) Len() int {
 	return len(iss)
 }
 
+//Swap indicates the method by which the sort package should swap elements
 func (iss byNumber) Swap(i, j int) {
 	temp := iss[i]
 	iss[i] = iss[j]
@@ -117,6 +118,8 @@ func (iss byMilestone) Swap(i, j int) {
 	iss[j] = temp
 }
 
+//Less returns true if element i is less than element j
+//It is implemented by the sort package
 func (iss byNumber) Less(i, j int) bool {
 	return *iss[i].Number < *iss[j].Number
 }
@@ -186,11 +189,6 @@ var orderChoice string
 var filterHeading string
 var filterString string
 
-// PassArgs allows the calling program to pass a file path as a string
-func PassArgs(s string) {
-	path = s
-}
-
 //Show is the main display function for the issue browser
 func Show() {
 	if err := setUp(); err != nil {
@@ -241,6 +239,7 @@ func Show() {
 	timer.Stop()
 }
 
+//layout sets out the initial window layout for the program
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 	if windowChanger, err := g.SetView("windowChanger", maxX, maxY, maxX+1, maxY+1); err != nil {
@@ -334,6 +333,7 @@ func layout(g *gocui.Gui) error {
 	return nil
 }
 
+//keybindings assigns actions to specific keys depending on what window they are pressed in
 func keybindings(g *gocui.Gui) error {
 	mainWindows := []string{"browser", "issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane"}
 	displayWindows := []string{"issuepane", "commentpane", "labelpane", "milestonepane", "assigneepane", "helpPane", "labelBrowser", "labelRemover", "sortChoice", "filterChoice"}
@@ -639,7 +639,7 @@ func keybindings(g *gocui.Gui) error {
 	return nil
 }
 
-//helper functions
+//getRepo returns a string representation of the respository that may be required by other functions
 func getRepo() string {
 	dat, err := ioutil.ReadFile(*gitissue.Path + ".git/config")
 	if err != nil {
@@ -661,6 +661,7 @@ func getRepo() string {
 	return ans
 }
 
+//getIssues returns an array of github issues from the repository returned by getRepo()
 func getIssues() []github.Issue {
 	iss, err := gitissue.Issues(getRepo())
 	if err != nil {
@@ -669,6 +670,8 @@ func getIssues() []github.Issue {
 	return iss
 }
 
+//getComments returns an array of github issue comments from the repository returned by getRepo()
+//length should be the length of the array returned by getIssues
 func getComments(length int) [][]github.IssueComment {
 	var com = make([][]github.IssueComment, length)
 	var err error
@@ -681,6 +684,7 @@ func getComments(length int) [][]github.IssueComment {
 	return com
 }
 
+//hide turns off command echoing on the terminal in order to hide user entry
 func hide() {
 	cmd := exec.Command("stty", "-echo")
 	cmd.Stdin = os.Stdin
@@ -691,6 +695,7 @@ func hide() {
 	}
 }
 
+//unhide undoes the actions of hide
 func unhide() {
 	cmd := exec.Command("stty", "echo")
 	cmd.Stdin = os.Stdin
@@ -733,6 +738,7 @@ func GetLogin() error {
 	return nil
 }
 
+//setUp runs all of the necessary checks during startup
 func setUp() error {
 	if err := GetLogin(); err != nil {
 		return err
@@ -750,11 +756,13 @@ func setUp() error {
 	return nil
 }
 
+//printIssues is used to print a specific issue Title, given it's index in the stored array
 func printIssues(g *gocui.Gui, v *gocui.View, i int) {
 	fmt.Fprint(v, *issueList[i].Number)
 	fmt.Fprintln(v, ": "+(*issueList[i].Title))
 }
 
+//showIssues prints the list of issues to the browser window
 func showIssues(g *gocui.Gui) error {
 	browser, err := g.View("browser")
 	if err != nil {
@@ -872,6 +880,7 @@ func showIssues(g *gocui.Gui) error {
 	return nil
 }
 
+//sortIssues sorts the list of issues depending on the sortChoice variable and then refreshes the display
 func sortIssues(g *gocui.Gui, v *gocui.View) error {
 	switch {
 	case sortChoice == "Number":
@@ -954,6 +963,8 @@ func sortIssues(g *gocui.Gui, v *gocui.View) error {
 }
 
 //functions called by keypress below
+
+//help displays a list of keybinds
 func help(g *gocui.Gui, v *gocui.View) error {
 	previousView = g.CurrentView()
 	maxX, maxY := g.Size()
@@ -1072,6 +1083,7 @@ func getFilterHeading(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//showSortOrders displays a list of potential sorting options
 func showSortOrders(g *gocui.Gui, v *gocui.View) error {
 	previousView = g.CurrentView()
 	maxX, maxY := g.Size()
@@ -1106,6 +1118,7 @@ func showSortOrders(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//getSortOrder sets the sortOrder variable to the users choice
 func getSortOrder(g *gocui.Gui, v *gocui.View) error {
 	_, cy := v.Cursor()
 	selection, err := v.Line(cy)
@@ -1140,6 +1153,7 @@ func getSortOrder(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//refresh queries the remote repository for an up to date version of the issues and comments and updates all local variables according
 func refresh(g *gocui.Gui, v *gocui.View) error {
 	var err error
 	issueList = getIssues()
@@ -1168,6 +1182,7 @@ func refresh(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//quit exits the application
 func quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
 }
@@ -1465,6 +1480,7 @@ func cursorupGetIssues(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//getLine parses the issue under the cursor in the browser window and displays the corresponding issue information in the relevant panels
 func getLine(g *gocui.Gui, v *gocui.View) error {
 	var l string
 	var err error
@@ -1593,6 +1609,7 @@ func getLine(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//toggleState changes and open issue to closed and vice versa
 func toggleState(g *gocui.Gui, v *gocui.View) error {
 	browser, err := g.View("browser")
 	if err != nil {
@@ -1629,6 +1646,7 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//newComment opens the new comment dialog box
 func newComment(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	maxX, maxY := g.Size()
@@ -1650,6 +1668,7 @@ func newComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//writeComment writes out the users comment entered into the new comment dialog box
 func writeComment(g *gocui.Gui, v *gocui.View) error {
 	comment := v.Buffer()
 	browser, err := g.View("browser")
@@ -1691,6 +1710,7 @@ func writeComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//openCommentEditor opens a list of comments for editing
 func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	issueIndex := 0
@@ -1754,6 +1774,7 @@ func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//editComment opens the individual comment chosed in openCommentEditor
 func editComment(g *gocui.Gui, v *gocui.View) error {
 	_, cy := v.Cursor()
 	commentLine, err := v.Line(cy)
@@ -1783,6 +1804,7 @@ func editComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//writeEditedComment writes out changes made to a comment
 func writeEditedComment(g *gocui.Gui, v *gocui.View) error {
 	commentBrowser, err := g.View("commentBrowser")
 	if err != nil {
@@ -1810,6 +1832,7 @@ func writeEditedComment(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//openCommentDeleter opens a list of comments for deletion
 func openCommentDeleter(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	issueIndex := 0
@@ -1873,6 +1896,7 @@ func openCommentDeleter(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//deleteComment deletes a comment chosen in openCommentDeleter
 func deleteComment(g *gocui.Gui, v *gocui.View) error {
 	_, cy := v.Cursor()
 	commentLine, err := v.Line(cy)
@@ -2135,6 +2159,7 @@ func writeLabel(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//newIssue opens the dialog box for generating a new issue
 func newIssue(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	maxX, maxY := g.Size()
@@ -2350,6 +2375,7 @@ func cancel(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+//changeWindow is used to change the window in active focus
 func changeWindow(g *gocui.Gui, v *gocui.View) error {
 	previousView = v
 	if err := g.SetCurrentView("windowChanger"); err != nil {
@@ -2442,6 +2468,7 @@ func windowLeft(g *gocui.Gui, v *gocui.View) error {
 	}
 }
 
+//nextWindow moves to the next window in sequence
 func nextWindow(g *gocui.Gui, v *gocui.View) error {
 	switch {
 	case previousView == nil || previousView.Name() == "assigneepane":
@@ -2461,6 +2488,7 @@ func nextWindow(g *gocui.Gui, v *gocui.View) error {
 	}
 }
 
+//previousWindow moves to the previous window in sequence
 func previousWindow(g *gocui.Gui, v *gocui.View) error {
 	switch {
 	case previousView == nil || previousView.Name() == "assigneepane":
@@ -2480,6 +2508,7 @@ func previousWindow(g *gocui.Gui, v *gocui.View) error {
 	}
 }
 
+//toggleIssues is used to swap between displaying open and closed issues
 func toggleIssues(g *gocui.Gui, v *gocui.View) error {
 	open, err := g.View("open")
 	if err != nil {
