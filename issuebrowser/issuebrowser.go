@@ -645,7 +645,7 @@ func keybindings(g *gocui.Gui) error {
 	return nil
 }
 
-//getRepo returns a string representation of the respository that may be required by other functions
+//getRepo returns a string representation of the repository that may be required by other functions
 func getRepo() string {
 	dat, err := ioutil.ReadFile(*gitissue.Path + ".git/config")
 	if err != nil {
