@@ -1,6 +1,7 @@
 package gitissue
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -12,22 +13,23 @@ import (
 // Comments used for storing comments offline
 // array of comments and issue number they relate to
 type Comments struct {
-	Issue []github.IssueComment
+	Issue []*github.IssueComment
 	Num   int
 }
 
 // Comment Comment on a issue on github.
 func Comment(repo, body string, issueNum int) (github.IssueComment, error) {
 	s := strings.Split(repo, "/")
+	ctx := context.Background()
 	comment := new(github.IssueComment)
 	comment.Body = &body
-	temp, _, err := client.Issues.CreateComment(s[0], s[1], issueNum, comment)
+	temp, _, err := client.Issues.CreateComment(ctx, s[0], s[1], issueNum, comment)
 	newComment := *temp
 	return newComment, err
 }
 
 // storecomments: Write comments for issue to array and save it to file.
-func storecomments(comments []github.IssueComment, issueNum int) error {
+func storecomments(comments []*github.IssueComment, issueNum int) error {
 	toWrite, err := readComments()
 	if err == nil {
 		toAppend := Comments{comments, issueNum}
@@ -63,7 +65,8 @@ func EditComment(repo, body string, commentID int) (github.IssueComment, error) 
 	s := strings.Split(repo, "/")
 	comment := new(github.IssueComment)
 	comment.Body = &body
-	temp, _, err := client.Issues.EditComment(s[0], s[1], commentID, comment)
+	ctx := context.Background()
+	temp, _, err := client.Issues.EditComment(ctx, s[0], s[1], commentID, comment)
 	newComment := *temp
 	return newComment, err
 }
@@ -71,22 +74,25 @@ func EditComment(repo, body string, commentID int) (github.IssueComment, error) 
 // DeleteComment Remove a comment from an issue.
 func DeleteComment(repo string, commentID int) error {
 	s := strings.Split(repo, "/")
-	_, err := client.Issues.DeleteComment(s[0], s[1], commentID)
+	ctx := context.Background()
+	_, err := client.Issues.DeleteComment(ctx, s[0], s[1], commentID)
 	return err
 }
 
 // ListLabels list all possible labels in a repo.
-func ListLabels(repo string) ([]github.Label, error) {
+func ListLabels(repo string) ([]*github.Label, error) {
 	s := strings.Split(repo, "/")
-	labels, _, err := client.Issues.ListLabels(s[0], s[1], nil)
+	ctx := context.Background()
+	labels, _, err := client.Issues.ListLabels(ctx, s[0], s[1], nil)
 	return labels, err
 }
 
 // ListComments Lists all the comments for a given issue.
-func ListComments(repo string, issueNum int) ([]github.IssueComment, error) {
+func ListComments(repo string, issueNum int) ([]*github.IssueComment, error) {
 	s := strings.Split(repo, "/")
 	err = nil
-	comments, _, err := client.Issues.ListComments(s[0], s[1], issueNum, nil)
+	ctx := context.Background()
+	comments, _, err := client.Issues.ListComments(ctx, s[0], s[1], issueNum, nil)
 	if err == nil {
 		err = storecomments(comments, issueNum)
 		return comments, err

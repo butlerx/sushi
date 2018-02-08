@@ -3,8 +3,21 @@ package issuebrowser
 import (
 	"sort"
 
+	"github.com/google/go-github/github"
 	"github.com/jroimartin/gocui"
 )
+
+//typeCasting Issues so that each has a different sort method, allowing issues to be sorted by any heading
+type byNumber []*github.Issue
+type byTitle []*github.Issue
+type byBody []*github.Issue
+type byUser []*github.Issue
+type byAssignee []*github.Issue
+type byComments []*github.Issue
+type byClosedAt []*github.Issue
+type byCreatedAt []*github.Issue
+type byUpdatedAt []*github.Issue
+type byMilestone []*github.Issue
 
 //sortIssues sorts the list of issues depending on the sortChoice variable and then refreshes the display
 func sortIssues(g *gocui.Gui, v *gocui.View) error {

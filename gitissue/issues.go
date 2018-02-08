@@ -1,6 +1,7 @@
 package gitissue
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -15,7 +16,7 @@ import (
 // Method for accessing issue.json.
 // Returns last pull if cant connect to server.
 // Repo should be structured as "user/repo"
-func Issues(repo string) ([]github.Issue, error) {
+func Issues(repo string) ([]*github.Issue, error) {
 	issues, err := IssuesFilter(repo, "all", "", "", "", "", "", nil)
 	if err == nil {
 		writeIssue(issues)
@@ -26,7 +27,7 @@ func Issues(repo string) ([]github.Issue, error) {
 		GitLog.Println("open issues: ", err)
 		os.Exit(1)
 	}
-	temp := new([]github.Issue)
+	temp := new([]*github.Issue)
 	if err = json.Unmarshal(file, temp); err != nil {
 		GitLog.Println("parse issues: ", err)
 		os.Exit(1)
@@ -39,7 +40,7 @@ func Issues(repo string) ([]github.Issue, error) {
 // Pass empty strings for things that arnt to be filtered.
 // Returns array of issues in order asked for.
 // TODO(butlerx) filter offline issues if query of repo fails.
-func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string, labels []string) ([]github.Issue, error) {
+func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string, labels []string) ([]*github.Issue, error) {
 	s := strings.Split(repo, "/")
 	sorting := new(github.IssueListByRepoOptions)
 	if len(labels) != 0 {
@@ -63,7 +64,8 @@ func IssuesFilter(repo, state, milestone, assignee, creator, sort, order string,
 	if order != "" {
 		sorting.Direction = order
 	}
-	issues, _, err := client.Issues.ListByRepo(s[0], s[1], sorting)
+	ctx := context.Background()
+	issues, _, err := client.Issues.ListByRepo(ctx, s[0], s[1], sorting)
 	return issues, err
 }
 
@@ -76,6 +78,7 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 	s := strings.Split(repo, "/")
 	newIssue := new(github.Issue)
 	state := "open"
+	ctx := context.Background()
 	if milestone == 0 {
 		issue := new(github.IssueRequest)
 		issue.Title = &title
@@ -83,10 +86,11 @@ func MakeIssue(repo, title, body, assignee string, milestone int, labels []strin
 		issue.Labels = &labels
 		issue.Assignee = &assignee
 		issue.State = &state
-		newIssue, _, err = client.Issues.Create(s[0], s[1], issue)
+		newIssue, _, err = client.Issues.Create(ctx, s[0], s[1], issue)
 	} else {
-		issue := github.IssueRequest{&title, &body, &labels, &assignee, &state, &milestone}
-		newIssue, _, err = client.Issues.Create(s[0], s[1], &issue)
+		var assignees []string
+		issue := github.IssueRequest{&title, &body, &labels, &assignee, &state, &milestone, &assignees}
+		newIssue, _, err = client.Issues.Create(ctx, s[0], s[1], &issue)
 	}
 	if err == nil {
 		_, err = Issues(repo)
@@ -115,7 +119,8 @@ func EditIssue(repo string, oldIssue *github.Issue) (*github.Issue, error) {
 		issue.Assignee = oldIssue.Assignee.Login
 	}
 	issue.State = oldIssue.State
-	updatedIssue, _, err := client.Issues.Edit(s[0], s[1], issueNum, issue)
+	ctx := context.Background()
+	updatedIssue, _, err := client.Issues.Edit(ctx, s[0], s[1], issueNum, issue)
 	if err == nil {
 		_, err = Issues(repo)
 	} else {
@@ -142,8 +147,9 @@ func OpenIssue(repo string, issue *github.Issue) (*github.Issue, error) {
 
 // LockIssue Locks issue so it cant be changed.
 func LockIssue(repo string, issueNum int) error {
+	ctx := context.Background()
 	s := strings.Split(repo, "/")
-	_, err := client.Issues.Lock(s[0], s[1], issueNum)
+	_, err := client.Issues.Lock(ctx, s[0], s[1], issueNum)
 	if err == nil {
 		_, err = Issues(repo)
 	}
@@ -153,7 +159,8 @@ func LockIssue(repo string, issueNum int) error {
 // UnlockIssue Unlocks issue to allow changes.
 func UnlockIssue(repo string, issueNum int) error {
 	s := strings.Split(repo, "/")
-	_, err := client.Issues.Unlock(s[0], s[1], issueNum)
+	ctx := context.Background()
+	_, err := client.Issues.Unlock(ctx, s[0], s[1], issueNum)
 	if err == nil {
 		_, err = Issues(repo)
 	}
@@ -161,7 +168,7 @@ func UnlockIssue(repo string, issueNum int) error {
 }
 
 // writeIssue: Write issues out to file.
-func writeIssue(toWrite []github.Issue) error {
+func writeIssue(toWrite []*github.Issue) error {
 	file := *Path + ".issue/issues.json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {

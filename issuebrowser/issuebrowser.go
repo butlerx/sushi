@@ -16,21 +16,9 @@ import (
 )
 
 var path = "./"
-var issueList []github.Issue
-var comments [][]github.IssueComment
-var labelList []github.Label
-
-//typeCasting Issues so that each has a different sort method, allowing issues to be sorted by any heading
-type byNumber []github.Issue
-type byTitle []github.Issue
-type byBody []github.Issue
-type byUser []github.Issue
-type byAssignee []github.Issue
-type byComments []github.Issue
-type byClosedAt []github.Issue
-type byCreatedAt []github.Issue
-type byUpdatedAt []github.Issue
-type byMilestone []github.Issue
+var issueList []*github.Issue
+var comments [][]*github.IssueComment
+var labelList []*github.Label
 
 //used for recording user input for creating/editing issues
 var tempIssueTitle string
@@ -86,7 +74,7 @@ func getRepo() string {
 }
 
 //getIssues returns an array of github issues from the repository returned by getRepo()
-func getIssues() []github.Issue {
+func getIssues() []*github.Issue {
 	iss, err := gitissue.Issues(getRepo())
 	if err != nil {
 		log.Panicln(err)
@@ -96,8 +84,8 @@ func getIssues() []github.Issue {
 
 //getComments returns an array of github issue comments from the repository returned by getRepo()
 //length should be the length of the array returned by getIssues
-func getComments(length int) [][]github.IssueComment {
-	var com = make([][]github.IssueComment, length)
+func getComments(length int) [][]*github.IssueComment {
+	var com = make([][]*github.IssueComment, length)
 	var err error
 	for i := 0; i < len(issueList); i++ {
 		com[i], err = gitissue.ListComments(getRepo(), (*issueList[i].Number))
@@ -229,18 +217,18 @@ func toggleState(g *gocui.Gui, v *gocui.View) error {
 	for i := 0; i < len(issueList); i++ {
 		if line[0] == strconv.Itoa(*issueList[i].Number) {
 			if *issueList[i].State != "open" {
-				temp, err := gitissue.OpenIssue(getRepo(), &issueList[i])
+				temp, err := gitissue.OpenIssue(getRepo(), issueList[i])
 				if err != nil {
 					return err
 				}
-				issueList[i] = *temp
+				issueList[i] = temp
 				break
 			} else {
-				temp, err := gitissue.CloseIssue(getRepo(), &issueList[i])
+				temp, err := gitissue.CloseIssue(getRepo(), issueList[i])
 				if err != nil {
 					return err
 				}
-				issueList[i] = *temp
+				issueList[i] = temp
 				break
 			}
 		}

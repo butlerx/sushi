@@ -1,6 +1,8 @@
 package gitissue
 
 import (
+	"context"
+
 	"github.com/butlerx/sushi/encrypt"
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
@@ -35,7 +37,7 @@ func setUser(user, oauth, userkey string) error {
 	}
 	b, err := json.Marshal(temp)
 	if err == nil {
-		err = ioutil.WriteFile(*Path+".issue/config.json", b, 0644)
+		err = ioutil.WriteFile(*Path+".issue", b, 0644)
 		return err
 	}
 	return nil
@@ -100,7 +102,8 @@ func Login(userkey string) error {
 	)
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
 	client = github.NewClient(tc)
-	user, _, err := client.Users.Get("")
+	ctx := context.Background()
+	user, _, err := client.Users.Get(ctx, "")
 
 	if err != nil {
 		GitLog.Printf("\nerror: %v\n", err)
@@ -112,9 +115,10 @@ func Login(userkey string) error {
 }
 
 // PossibleAssignees Get a list of all possible assingees
-func PossibleAssignees(repo string) ([]github.User, error) {
+func PossibleAssignees(repo string) ([]*github.User, error) {
 	s := strings.Split(repo, "/")
-	assignees, _, err := client.Issues.ListAssignees(s[0], s[1], nil)
+	ctx := context.Background()
+	assignees, _, err := client.Issues.ListAssignees(ctx, s[0], s[1], nil)
 	return assignees, err
 }
 
@@ -122,13 +126,14 @@ func PossibleAssignees(repo string) ([]github.User, error) {
 // Rings terminal bell and
 // returns true and the reason if something happened in repo.
 // returns false if nothing changed
-func WatchRepo(repo string) (string, string, bool) {
+func WatchRepo(repo string) (string, string, bool, error) {
 	s := strings.Split(repo, "/")
-	subscription, _, err := client.Activity.GetRepositorySubscription(s[0], s[1])
+	ctx := context.Background()
+	subscription, _, err := client.Activity.GetRepositorySubscription(ctx, s[0], s[1])
 	if err == nil && subscription != nil {
-		notification, _, err := client.Activity.GetThread(*subscription.ThreadURL)
+		notification, _, err := client.Activity.GetThread(ctx, *subscription.ThreadURL)
 		if err == nil && *notification.Unread == true {
-			_, err = client.Activity.MarkThreadRead(*subscription.ThreadURL)
+			_, err = client.Activity.MarkThreadRead(ctx, *subscription.ThreadURL)
 			return *notification.Reason, *notification.Subject.Title, true, err
 		}
 	}
@@ -137,15 +142,17 @@ func WatchRepo(repo string) (string, string, bool) {
 
 // list all all of a users repos.
 // currently unused.
-func repos() ([]github.Repository, error) {
-	repos, _, err := client.Repositories.List("", nil)
+func repos() ([]*github.Repository, error) {
+	ctx := context.Background()
+	repos, _, err := client.Repositories.List(ctx, "", nil)
 	return repos, err
 }
 
 // List all orgs a users a part of.
 // currently unused.
-func orgsList() ([]github.Organization, error) {
+func orgsList() ([]*github.Organization, error) {
 	GitLog.Println(Conf.Username)
-	orgs, _, err := client.Organizations.List(Conf.Username, nil)
+	ctx := context.Background()
+	orgs, _, err := client.Organizations.List(ctx, Conf.Username, nil)
 	return orgs, err
 }

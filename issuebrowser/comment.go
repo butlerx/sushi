@@ -117,7 +117,7 @@ func openCommentEditor(g *gocui.Gui, v *gocui.View) error {
 				}
 			}
 			for i := 0; i < len(comments[commentIndex]); i++ {
-				fmt.Fprintln(commentBrowser, strconv.Itoa(*comments[commentIndex][i].ID)+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
+				fmt.Fprintln(commentBrowser, strconv.Itoa(int(*comments[commentIndex][i].ID))+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
 			}
 		} else {
 			fmt.Fprintln(commentBrowser, "This issue has no comments")
@@ -239,7 +239,7 @@ func openCommentDeleter(g *gocui.Gui, v *gocui.View) error {
 				}
 			}
 			for i := 0; i < len(comments[commentIndex]); i++ {
-				fmt.Fprintln(commentDeleter, strconv.Itoa(*comments[commentIndex][i].ID)+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
+				fmt.Fprintln(commentDeleter, strconv.Itoa(int(*comments[commentIndex][i].ID))+": "+*comments[commentIndex][i].User.Login+"@"+(*comments[commentIndex][i].CreatedAt).Format(time.UnixDate))
 			}
 		} else {
 			fmt.Fprintln(commentDeleter, "This issue has no comments")
@@ -335,7 +335,7 @@ func getLineComment(g *gocui.Gui, v *gocui.View) error {
 	}
 	commentViewer.Clear()
 	for i := 0; i < len(comments[commentIndex]); i++ {
-		if IDnum == *comments[commentIndex][i].ID {
+		if IDnum == int(*comments[commentIndex][i].ID) {
 			fmt.Fprintln(commentViewer, *comments[commentIndex][i].Body)
 			break
 		}

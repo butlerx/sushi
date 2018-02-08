@@ -29,7 +29,10 @@ func Show() {
 	window.Cursor = true
 	timer := cron.New()
 	timer.AddFunc("0 5 * * * *", func() {
-		reason, subject, update := gitissue.WatchRepo(getRepo())
+		reason, subject, update, err := gitissue.WatchRepo(getRepo())
+		if err != nil {
+			log.Panic(err)
+		}
 		if update {
 			fmt.Print("\a")
 			notifications, err := window.View("notifications")
