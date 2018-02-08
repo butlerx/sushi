@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/butlerx/AgileGit/issuebrowser"
+	"github.com/butlerx/sushi/issuebrowser"
 )
 
 func main() {
