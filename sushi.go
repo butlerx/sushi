@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/butlerx/AgileGit/issuebrowser"
+	"github.com/butlerx/sushi/issuebrowser"
 )
 
 func main() {
 	var path string
 	switch {
 	case len(os.Args) == 1:
-		//fmt.Println("Please add an arguement")
 		issuebrowser.Show()
 
 	case os.Args[1] == "ilist":

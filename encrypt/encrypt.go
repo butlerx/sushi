@@ -1,7 +1,6 @@
 package encrypt
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -9,7 +8,7 @@ import (
 	"io"
 )
 
-// encrypt string to base64 crypto using AES
+// Encrypt encrypt string to base64 crypto using AES
 func Encrypt(key []byte, text string) string {
 	plaintext := []byte(text)
 
@@ -29,28 +28,4 @@ func Encrypt(key []byte, text string) string {
 
 	// convert to base64
 	return base64.URLEncoding.EncodeToString(ciphertext)
-}
-
-// decrypt from base64 to decrypted string
-func Decrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err)
-	}
-
-	if len(ciphertext) < aes.BlockSize {
-		panic("ciphertext too short")
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-	n := bytes.IndexByte(ciphertext, 0)
-	text := string(ciphertext[:n])
-	return text
 }
