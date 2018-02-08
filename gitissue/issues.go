@@ -169,7 +169,7 @@ func UnlockIssue(repo string, issueNum int) error {
 
 // writeIssue: Write issues out to file.
 func writeIssue(toWrite []*github.Issue) error {
-	file := *Path + ".issue/issues.json"
+	file := *Path + ".gitissue/issues.json"
 	b, err := json.Marshal(toWrite)
 	if err == nil {
 		err = ioutil.WriteFile(file, b, 0644)

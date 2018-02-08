@@ -34,7 +34,7 @@ func storecomments(comments []*github.IssueComment, issueNum int) error {
 	if err == nil {
 		toAppend := Comments{comments, issueNum}
 		toWrite = append(toWrite, toAppend)
-		file := *Path + ".issue/comments.json"
+		file := *Path + ".gitissue/comments.json"
 		b, err := json.Marshal(toWrite)
 		if err == nil {
 			err = ioutil.WriteFile(file, b, 0644)
@@ -45,7 +45,7 @@ func storecomments(comments []*github.IssueComment, issueNum int) error {
 
 // readComment Reads in comments from comments.json.
 func readComments() ([]Comments, error) {
-	file := *Path + ".issue/comments.json"
+	file := *Path + ".gitissue/comments.json"
 	read, err := ioutil.ReadFile(file)
 	if err != nil {
 		GitLog.Println("open comments: ", err)

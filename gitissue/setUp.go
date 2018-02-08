@@ -20,29 +20,29 @@ func SetUp(user, oauth, key string) error {
 	if err != nil {
 		return err
 	}
-	_, err = ioutil.ReadFile(*Path + ".issue/config.json")
+	_, err = ioutil.ReadFile(*Path + ".gitissue/config.json")
 	if err != nil {
 		err = setUser(user, oauth, key)
 		if err != nil {
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(*Path + ".issue/issues.json")
+	_, err = ioutil.ReadFile(*Path + ".gitissue/issues.json")
 	if err != nil {
 		temp := new([]github.Issue)
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(*Path+".issue/issues.json", b, 0644)
+			err = ioutil.WriteFile(*Path+".gitissue/issues.json", b, 0644)
 		} else {
 			return err
 		}
 	}
-	_, err = ioutil.ReadFile(*Path + ".issue/comments.json")
+	_, err = ioutil.ReadFile(*Path + ".gitissue/comments.json")
 	if err != nil {
 		temp := new([]Comments)
 		b, err := json.Marshal(temp)
 		if err == nil {
-			err = ioutil.WriteFile(*Path+".issue/comments.json", b, 0644)
+			err = ioutil.WriteFile(*Path+".gitissue/comments.json", b, 0644)
 		} else {
 			return err
 		}
@@ -50,10 +50,10 @@ func SetUp(user, oauth, key string) error {
 	_, err = ioutil.ReadFile(*Path + ".gitignore")
 	if err == nil {
 		f, _ := os.OpenFile(".gitignore", os.O_APPEND, 0446)
-		_, _ = f.WriteString(".issue/config.json")
+		_, _ = f.WriteString(".gitissue/config.json")
 		f.Close()
 	} else {
-		ignore := []byte(".issue/config.json")
+		ignore := []byte(".gitissue/config.json")
 		err = ioutil.WriteFile(".gitignore", ignore, 0644)
 		return err
 	}
@@ -66,11 +66,11 @@ func IsSetUp() (bool, error) {
 		err := errors.New("Not git repo")
 		return false, err
 	}
-	_, err = os.Stat(*Path + ".issue")
+	_, err = os.Stat(*Path + ".gitissue")
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
+	file, err := ioutil.ReadFile(*Path + ".gitissue/config.json")
 	if err != nil {
 		return false, nil
 	}
@@ -101,12 +101,12 @@ func logSetUp() *log.Logger {
 	if err != nil {
 		return nil
 	}
-	_, err = ioutil.ReadFile(*Path + ".issue/sushi.log")
+	_, err = ioutil.ReadFile(*Path + ".gitissue/sushi.log")
 	logFile := new(os.File)
 	if err != nil {
-		logFile, err = os.Create(*Path + ".issue/sushi.log")
+		logFile, err = os.Create(*Path + ".gitissue/sushi.log")
 	} else {
-		logFile, err = os.OpenFile(*Path+".issue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		logFile, err = os.OpenFile(*Path+".gitissue/sushi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	}
 	if err != nil {
 		log.Fatalln("Failed to open logfile: ", err)
@@ -116,9 +116,9 @@ func logSetUp() *log.Logger {
 }
 
 func makeFolder() error {
-	_, err = os.Stat(*Path + ".issue")
+	_, err = os.Stat(*Path + ".gitissue")
 	if os.IsNotExist(err) {
-		err := os.Mkdir(*Path+".issue", 0755)
+		err := os.Mkdir(*Path+".gitissue", 0755)
 		if err != nil {
 			log.Println("make folder: ", err)
 			return err

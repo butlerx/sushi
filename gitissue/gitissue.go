@@ -37,7 +37,7 @@ func setUser(user, oauth, userkey string) error {
 	}
 	b, err := json.Marshal(temp)
 	if err == nil {
-		err = ioutil.WriteFile(*Path+".issue", b, 0644)
+		err = ioutil.WriteFile(*Path+".gitissue", b, 0644)
 		return err
 	}
 	return nil
@@ -45,7 +45,7 @@ func setUser(user, oauth, userkey string) error {
 
 // ChangeKey Change user encyption key
 func ChangeKey(oldKey, newKey string) error {
-	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
+	file, err := ioutil.ReadFile(*Path + ".gitissue/config.json")
 	if err != nil {
 		GitLog.Println("open config: ", err)
 		os.Exit(1)
@@ -81,7 +81,7 @@ func ChangeLogin(user, oauth, key string) error {
 // Login Logs in to github using oauth.
 // Returns error if login fails.
 func Login(userkey string) error {
-	file, err := ioutil.ReadFile(*Path + ".issue/config.json")
+	file, err := ioutil.ReadFile(*Path + ".gitissue/config.json")
 	if err != nil {
 		GitLog.Println("open config: ", err)
 		os.Exit(1)
